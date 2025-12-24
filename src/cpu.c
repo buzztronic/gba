@@ -6,8 +6,6 @@
 #include "thumb.h"
 #include "common.h"
 
-enum InstrType {IT_NOT_IMPLEMENTED, IT_BRANCH};
-
 // declarations
 int cond_pass(u32 opcode, u32 cpsr);
 uint cpu_step_arm(Cpu *this);
@@ -16,12 +14,7 @@ void cpu_reset_pipeline(Cpu *this);
 
 uint cpu_execute_not_implemented(Cpu *this, u32 opcode);
 uint cpu_execute_branch(Cpu *this, u32 opcode);
-
-enum InstrType cpu_decode(u32 opcode);
-uint (*cpu_execute[]) (Cpu *, u32) = {
-    [IT_NOT_IMPLEMENTED] = cpu_execute_not_implemented,
-    [IT_BRANCH] = cpu_execute_branch,
-};
+static void cpu_build_decode_table(Cpu *this);
 
 // functions
 Cpu *cpu_init(Bus *bus)
@@ -39,6 +32,8 @@ Cpu *cpu_init(Bus *bus)
 
     cpu->bus = bus;
     cpu->pc_changed = 1;
+
+    cpu_build_decode_table(cpu);
 
     return cpu;
 }
@@ -65,7 +60,8 @@ uint cpu_step_arm(Cpu *this)
 
     // decode and execute
     if (cond_pass(opcode, this->cpsr)) {
-        cycles = cpu_execute[cpu_decode(opcode)](this, opcode);
+        u32 index = (bits(opcode, 20, 8) << 4) | bits(opcode, 4, 4);
+        cycles = this->decode[index](this, opcode);
     } else {
         cycles = 1;
     }
@@ -131,13 +127,19 @@ uint cpu_execute_branch(Cpu *this, u32 opcode)
     return 1;
 }
 
-enum InstrType cpu_decode(u32 opcode)
+static void cpu_build_decode_table(Cpu *this)
 {
-    if (bits(opcode, 25, 3) == 5) {
-        return IT_BRANCH;
+    for (uint idx = 0; idx < (1 << 12); ++idx) {
+        // unpack idx to make it easier to follow documentation
+        // bits[0:3] become bits[4:7]
+        // bits[4:12] become bits[20:27]
+        u32 opcode = (bits(idx, 4, 8) << 20) | (bits(idx, 0, 4) << 4);
+        if (bits(opcode, 25, 3) == 5) {
+            this->decode[idx] = cpu_execute_branch;
+        } else {
+            this->decode[idx] = cpu_execute_not_implemented;
+        }
     }
-
-    return IT_NOT_IMPLEMENTED;
 }
 
 int cond_pass(u32 opcode, u32 cpsr)

@@ -18,6 +18,9 @@ enum Spsr_index {SPSR_FIQ, SPSR_SVC, SPSR_ABT, SPSR_IRQ, SPSR_UND};
 typedef struct Cpu {
     Bus *bus;
 
+    // decoding look up table
+    uint (*decode[1 << 12]) (struct Cpu *, u32);
+
     u32 *reg[16];
 
     u32 reg_usr[16];
