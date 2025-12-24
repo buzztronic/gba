@@ -11,7 +11,6 @@ CFLAGS = \
 		 -pg \
 		 -O0 \
 		 -Wall \
-		 #-Wextra \
 		 -std=c99 \
 		 -pedantic \
 		 -MMD \
