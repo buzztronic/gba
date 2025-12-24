@@ -1,0 +1,11 @@
+build
+gba
+gmon.out
+
+compile_commands.json
+
+roms/*
+roms/tests/*
+!roms/tests
+!roms/tests/panda.gba
+!roms/tests/arm.gba
