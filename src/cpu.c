@@ -7,13 +7,14 @@
 #include "common.h"
 
 // declarations
-int cond_pass(u32 opcode, u32 cpsr);
-uint cpu_step_arm(Cpu *this);
-u32 cpu_fetch_arm(Cpu *this);
-void cpu_reset_pipeline(Cpu *this);
+static int cond_pass(u32 opcode, u32 cpsr);
+static uint cpu_step_arm(Cpu *this);
+static u32 cpu_fetch_arm(Cpu *this);
+static void cpu_reset_pipeline(Cpu *this);
 
-uint cpu_execute_not_implemented(Cpu *this, u32 opcode);
-uint cpu_execute_branch(Cpu *this, u32 opcode);
+static uint cpu_execute_not_implemented(Cpu *this, u32 opcode);
+static uint cpu_execute_branch(Cpu *this, u32 opcode);
+static uint cpu_execute_alu(Cpu *this, u32 opcode);
 static void cpu_build_decode_table(Cpu *this);
 
 // functions
@@ -127,6 +128,12 @@ uint cpu_execute_branch(Cpu *this, u32 opcode)
     return 1;
 }
 
+static uint cpu_execute_alu(Cpu *this, u32 opcode)
+{
+    puts("ALU");
+    return 0;
+}
+
 static void cpu_build_decode_table(Cpu *this)
 {
     for (uint idx = 0; idx < (1 << 12); ++idx) {
@@ -136,6 +143,21 @@ static void cpu_build_decode_table(Cpu *this)
         u32 opcode = (bits(idx, 4, 8) << 20) | (bits(idx, 0, 4) << 4);
         if (bits(opcode, 25, 3) == 5) {
             this->decode[idx] = cpu_execute_branch;
+        } else if (bits(opcode, 26, 2) == 0) {
+            u32 alu_opcode = bits(opcode, 21, 4);
+            // if bit[25] == 0 bit[4] == 1 bit[7] == 1 then it is not an ALU
+            // instruction.
+            // if alu opcode is one of CMP/CMN/TST/TEQ then bit[20] must be 1
+            // otherwise it is not an ALU instruction.
+            if (bit(opcode, 25) == 0 && bit(opcode, 4) && bit(opcode, 7)) {
+                // not ALU but something else
+                this->decode[idx] = cpu_execute_not_implemented;
+            } else if (bit(opcode, 20) == 0 && alu_opcode >= 8 && alu_opcode <= 11) {
+                // not ALU but something else
+                this->decode[idx] = cpu_execute_not_implemented;
+            } else {
+                this->decode[idx] = cpu_execute_alu;
+            }
         } else {
             this->decode[idx] = cpu_execute_not_implemented;
         }
