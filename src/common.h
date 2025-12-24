@@ -12,10 +12,16 @@ typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
 
-#define is_clear(data, mask) (!((data) & (mask)))
-#define is_set(data, mask) ((data) & (mask))
+#define is_clear(data, bit) (!((data) & (1 << (bit))))
+#define is_set(data, bit) ((data) & (1 << (bit)))
+
+#define set_bit(dst, bit) (dst |= (1 << (bit)))
+#define clear_bit(dst, bit) (dst &= ~(1 << (bit)))
 
 #define in_range(data, start, end) ((data) >= (start) && (data) <= (end))
+
+u32 ror32(u32 data, u32 n);
+u32 asr32(u32 data, u32 n);
 
 inline int bit(u32 val, u32 idx)
 {

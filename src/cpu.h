@@ -5,13 +5,13 @@
 #define reg(n) (*this->reg[n])
 
 #define PSR_MASK_MODE 0x1F
-#define PSR_MASK_T (1 << 5)
-#define PSR_MASK_F (1 << 6)
-#define PSR_MASK_I (1 << 7)
-#define PSR_MASK_V (1 << 28)
-#define PSR_MASK_C (1 << 29)
-#define PSR_MASK_Z (1 << 30)
-#define PSR_MASK_N (1 << 31)
+#define PSR_BIT_T 5
+#define PSR_BIT_F 6
+#define PSR_BIT_I 7
+#define PSR_BIT_V 28
+#define PSR_BIT_C 29
+#define PSR_BIT_Z 30
+#define PSR_BIT_N 31
 
 enum Spsr_index {SPSR_FIQ, SPSR_SVC, SPSR_ABT, SPSR_IRQ, SPSR_UND};
 
