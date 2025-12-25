@@ -61,7 +61,7 @@ Bus *bus_init(const char *rom)
 
 u8 bus_read(Bus *this, u32 addr)
 {
-    for (uint i = 0; i < sizeof(this->map); ++i) {
+    for (uint i = 0; i < len(this->map); ++i) {
         u32 start = this->map[i].start;
         if (in_range(addr, start, this->map[i].end)) {
             return this->map[i].mem[addr-start];
@@ -73,7 +73,7 @@ u8 bus_read(Bus *this, u32 addr)
 
 void bus_write(Bus *this, u32 addr, u8 data)
 {
-    for (uint i = 0; i < sizeof(this->map); ++i) {
+    for (uint i = 0; i < len(this->map); ++i) {
         u32 start = this->map[i].start;
         if (in_range(addr, start, this->map[i].end)) {
             this->map[i].mem[addr-start] = data;

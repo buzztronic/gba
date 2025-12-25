@@ -15,6 +15,7 @@ static void cpu_reset_pipeline(Cpu *this);
 static uint cpu_execute_not_implemented(Cpu *this, u32 opcode);
 static uint cpu_execute_branch(Cpu *this, u32 opcode);
 static uint cpu_execute_alu(Cpu *this, u32 opcode);
+static uint cpu_execute_signed_transfer(Cpu *this, u32 opcode);
 static void cpu_build_decode_table(Cpu *this);
 
 static u32 compute_shift(Cpu *this, u32 opcode, u32 rm, u32 *carry);
@@ -251,8 +252,99 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
     return 1;
 }
 
+static uint cpu_execute_signed_transfer(Cpu *this, u32 opcode)
+{
+    // page 34
+    // review this implemention it is probably bugged
+    puts("LD/ST Signed");
+
+    u32 bit_p = bit(opcode, 24);
+    u32 bit_u = bit(opcode, 23);
+    u32 bit_i = bit(opcode, 22);
+    u32 bit_w = bit(opcode, 21);
+    u32 bit_l = bit(opcode, 20);
+    u32 bits_sh = bits(opcode, 5, 2);
+    u32 rn = bits(opcode, 16, 4);
+    u32 rd = bits(opcode, 12, 4);
+    u32 rm = bits(opcode, 0, 4);
+    u32 offset = (bits(opcode, 8, 4) << 4) | bits(opcode, 0, 4);
+
+    // rn = base (including r15 = pc+8)
+    // rd = src/dst (including r15 = pc+12)
+    // rm = offset register
+    // load/store halfword
+    // load signed bytes/halfwords
+    // address = base +/- offset
+    // base = address (if auto-indexing enabled)
+
+    if (!bit_i) {
+        offset = reg(rm);
+    }
+
+    u32 addr = reg(rn);
+
+    // pre-indexed
+    if (bit_p) {
+        if (bit_u)
+            addr += offset;
+        else
+            addr -= offset;
+    }
+
+    if (bit_l) {
+        switch (bits_sh) {
+            case 1:
+                // unsigned halfword
+                reg(rd) = bus_read16(this->bus, addr);
+            break;
+            case 2:
+                // signed byte
+                reg(rd) = (i32)bus_read(this->bus, addr);
+            break;
+            case 3:
+                // signed halfword
+                reg(rd) = (i32)bus_read16(this->bus, addr);
+            break;
+        }
+    } else {
+        // store
+        u32 data = reg(rd);
+        if (rd == 15)
+            data += 4;
+        bus_write16(this->bus, addr, data);
+    }
+
+    // post-indexed
+    if (!bit_p) {
+        if (bit_u)
+            addr += offset;
+        else
+            addr -= offset;
+
+        assert(bit_w == 0);
+    }
+
+    // write-back
+    if (!bit_p || bit_w) {
+        // NOTE: write-back is always enabled when P=0 and W bit is not used
+        // and must be 0
+
+        reg(rn) = addr;
+        if (rn == 15) {
+            assert(rn != 15);
+        }
+    }
+
+    // PC has changed
+    if (bit_l && rd == 15) {
+        this->pc_changed = 1;
+    }
+    return 2;
+}
+
 static void cpu_build_decode_table(Cpu *this)
 {
+    // TODO Clean up this mess
     for (uint idx = 0; idx < (1 << 12); ++idx) {
         // unpack idx to make it easier to follow documentation
         // bits[0:3] become bits[4:7]
@@ -260,24 +352,30 @@ static void cpu_build_decode_table(Cpu *this)
         u32 opcode = (bits(idx, 4, 8) << 20) | (bits(idx, 0, 4) << 4);
         if (bits(opcode, 25, 3) == 5) {
             this->decode[idx] = cpu_execute_branch;
-        } else if (bits(opcode, 26, 2) == 0) {
+            continue;
+        }
+        if (bits(opcode, 26, 2) == 0) {
             u32 alu_opcode = bits(opcode, 21, 4);
             // if bit[25] == 0 bit[4] == 1 bit[7] == 1 then it is not an ALU
             // instruction.
             // if alu opcode is one of CMP/CMN/TST/TEQ then bit[20] must be 1
             // otherwise it is not an ALU instruction.
             if (bit(opcode, 25) == 0 && bit(opcode, 4) && bit(opcode, 7)) {
-                // not ALU but something else
-                this->decode[idx] = cpu_execute_not_implemented;
             } else if (bit(opcode, 20) == 0 && alu_opcode >= 8 && alu_opcode <= 11) {
-                // not ALU but something else
-                this->decode[idx] = cpu_execute_not_implemented;
             } else {
                 this->decode[idx] = cpu_execute_alu;
+                continue;
             }
-        } else {
-            this->decode[idx] = cpu_execute_not_implemented;
         }
+        if (bit(opcode, 22) == 0 && bits(opcode, 11, 4) != 0) {
+            // not signed transfer
+        } else if (bit(opcode, 24) == 0 && bit(opcode, 21) == 1) {
+            // not signed transfer
+        } else if (bits(opcode, 25, 3) == 0 && bit(opcode, 4) && bit(opcode, 7)) {
+            this->decode[idx] = cpu_execute_signed_transfer;
+            continue;
+        }
+        this->decode[idx] = cpu_execute_not_implemented;
     }
 }
 

@@ -12,6 +12,7 @@ typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
 
+#define len(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define is_clear(data, bit) (!((data) & (1 << (bit))))
 #define is_set(data, bit) ((data) & (1 << (bit)))
 
