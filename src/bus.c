@@ -5,6 +5,7 @@
 
 static void bus_load_bios(Bus *this, const char *bios);
 static void bus_load_rom(Bus *this, const char *rom);
+static u8 *bus_get_ptr(Bus *this, u32 addr);
 
 Bus *bus_init(const char *rom)
 {
@@ -59,54 +60,74 @@ Bus *bus_init(const char *rom)
     return bus;
 }
 
-u8 bus_read(Bus *this, u32 addr)
+static u8 *bus_get_ptr(Bus *this, u32 addr)
 {
     for (uint i = 0; i < len(this->map); ++i) {
         u32 start = this->map[i].start;
         if (in_range(addr, start, this->map[i].end)) {
-            return this->map[i].mem[addr-start];
+            return &this->map[i].mem[addr-start];
         }
     }
+
+    return NULL;
+}
+
+u8 bus_read(Bus *this, u32 addr)
+{
+    u8 *ptr = bus_get_ptr(this, addr);
+    if (ptr != NULL)
+        return *ptr;
 
     return 0xFF;
 }
 
 void bus_write(Bus *this, u32 addr, u8 data)
 {
-    for (uint i = 0; i < len(this->map); ++i) {
-        u32 start = this->map[i].start;
-        if (in_range(addr, start, this->map[i].end)) {
-            this->map[i].mem[addr-start] = data;
-            return;
-        }
-    }
+    u8 *ptr = bus_get_ptr(this, addr);
+    if (ptr == NULL)
+        return;
+
+    *ptr = data;
 }
 
 u16 bus_read16(Bus *this, u32 addr)
 {
-    return bus_read(this, addr) + (bus_read(this, addr+1) << 8);
+    u8 *ptr = bus_get_ptr(this, addr);
+    if (ptr == NULL)
+        return 0xFFFF;
+
+    return ptr[0] | (ptr[1] << 8);
 }
 
 void bus_write16(Bus *this, u32 addr, u16 data)
 {
-    bus_write(this, addr, data);
-    bus_write(this, addr+1, data >> 8);
+    u8 *ptr = bus_get_ptr(this, addr);
+    if (ptr == NULL)
+        return;
+
+    ptr[0] = data & 0xFF;
+    ptr[1] = data >> 8;
 }
 
 u32 bus_read32(Bus *this, u32 addr)
 {
-    return bus_read(this, addr) +
-        (bus_read(this, addr+1) << 8) +
-        (bus_read(this, addr+2) << 16) +
-        (bus_read(this, addr+3) << 24);
+    u8 *ptr = bus_get_ptr(this, addr);
+    if (ptr == NULL)
+        return 0xFFFFFFFF;
+
+    return ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24);
 }
 
 void bus_write32(Bus *this, u32 addr, u32 data)
 {
-    bus_write(this, addr, data);
-    bus_write(this, addr+1, data >> 8);
-    bus_write(this, addr+2, data >> 16);
-    bus_write(this, addr+3, data >> 24);
+    u8 *ptr = bus_get_ptr(this, addr);
+    if (ptr == NULL)
+        return;
+
+    ptr[0] = data;
+    ptr[1] = data >> 8;
+    ptr[2] = data >> 16;
+    ptr[3] = data >> 24;
 }
 
 static void bus_load_bios(Bus *this, const char *bios)
