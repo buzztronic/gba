@@ -57,3 +57,5 @@ void bus_write16(Bus *this, u32 addr, u16 data);
 
 u32 bus_read32(Bus *this, u32 addr);
 void bus_write32(Bus *this, u32 addr, u32 data);
+
+u8 *bus_getvram(Bus *this);

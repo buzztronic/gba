@@ -166,3 +166,8 @@ static void bus_load_rom(Bus *this, const char *rom)
 
     fclose(f);
 }
+
+u8 *bus_getvram(Bus *this)
+{
+    return this->vram;
+}

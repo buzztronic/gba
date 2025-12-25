@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include <SDL.h>
-
 #include "cpu.h"
 #include "thumb.h"
 #include "common.h"
