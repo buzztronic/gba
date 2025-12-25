@@ -17,59 +17,70 @@ Bus *bus_init(const char *rom)
     bus->map[0].end = BIOS_ADDR + BIOS_SIZE;
     bus->map[0].mem = bus->bios;
 
-    bus->map[1].start = EWRAM_ADDR;
-    bus->map[1].end = EWRAM_ADDR + EWRAM_SIZE;
-    bus->map[1].mem = bus->ewram;
+    bus->map[1].start = BIOS_ADDR;
+    bus->map[1].end = BIOS_ADDR + BIOS_SIZE;
+    bus->map[1].mem = bus->bios;
 
-    bus->map[2].start = IWRAM_ADDR;
-    bus->map[2].end = IWRAM_ADDR + IWRAM_SIZE;
-    bus->map[2].mem = bus->iwram;
+    bus->map[2].start = EWRAM_ADDR;
+    bus->map[2].end = EWRAM_ADDR + EWRAM_SIZE;
+    bus->map[2].mem = bus->ewram;
 
-    bus->map[3].start = IO_ADDR;
-    bus->map[3].end = IO_ADDR + IO_SIZE;
-    bus->map[3].mem = bus->io;
+    bus->map[3].start = IWRAM_ADDR;
+    bus->map[3].end = IWRAM_ADDR + IWRAM_SIZE;
+    bus->map[3].mem = bus->iwram;
 
-    bus->map[4].start = PLT_ADDR;
-    bus->map[4].end = PLT_ADDR + PLT_SIZE;
-    bus->map[4].mem = bus->plt;
+    bus->map[4].start = IO_ADDR;
+    bus->map[4].end = IO_ADDR + IO_SIZE;
+    bus->map[4].mem = bus->io;
 
-    bus->map[5].start = VRAM_ADDR;
-    bus->map[5].end = VRAM_ADDR + VRAM_SIZE;
-    bus->map[5].mem = bus->vram;
+    bus->map[5].start = PLT_ADDR;
+    bus->map[5].end = PLT_ADDR + PLT_SIZE;
+    bus->map[5].mem = bus->plt;
 
-    bus->map[6].start = OAM_ADDR;
-    bus->map[6].end = OAM_ADDR + OAM_SIZE;
-    bus->map[6].mem = bus->oam;
+    bus->map[6].start = VRAM_ADDR;
+    bus->map[6].end = VRAM_ADDR + VRAM_SIZE;
+    bus->map[6].mem = bus->vram;
 
-    bus->map[7].start = ROM_ADDR1;
-    bus->map[7].end = ROM_ADDR1 + ROM_SIZE;
-    bus->map[7].mem = bus->rom;
+    bus->map[7].start = OAM_ADDR;
+    bus->map[7].end = OAM_ADDR + OAM_SIZE;
+    bus->map[7].mem = bus->oam;
 
-    bus->map[8].start = ROM_ADDR2;
-    bus->map[8].end = ROM_ADDR2 + ROM_SIZE;
+    bus->map[8].start = ROM_ADDR1;
+    bus->map[8].end = ROM_ADDR1 + ROM_SIZE;
     bus->map[8].mem = bus->rom;
-
-    bus->map[9].start = ROM_ADDR3;
-    bus->map[9].end = ROM_ADDR3 + ROM_SIZE;
+    bus->map[9].start = ROM_ADDR1;
+    bus->map[9].end = ROM_ADDR1 + ROM_SIZE;
     bus->map[9].mem = bus->rom;
 
-    bus->map[10].start = SRAM_ADDR;
-    bus->map[10].end = SRAM_ADDR + SRAM_SIZE;
-    bus->map[10].mem = bus->sram;
+    bus->map[0xA].start = ROM_ADDR2;
+    bus->map[0xA].end = ROM_ADDR2 + ROM_SIZE;
+    bus->map[0xA].mem = bus->rom;
+    bus->map[0xB].start = ROM_ADDR2;
+    bus->map[0xB].end = ROM_ADDR2 + ROM_SIZE;
+    bus->map[0xB].mem = bus->rom;
+
+    bus->map[0xC].start = ROM_ADDR3;
+    bus->map[0xC].end = ROM_ADDR3 + ROM_SIZE;
+    bus->map[0xC].mem = bus->rom;
+    bus->map[0xD].start = ROM_ADDR3;
+    bus->map[0xD].end = ROM_ADDR3 + ROM_SIZE;
+    bus->map[0xD].mem = bus->rom;
+
+    bus->map[0xE].start = SRAM_ADDR;
+    bus->map[0xE].end = SRAM_ADDR + SRAM_SIZE;
+    bus->map[0xE].mem = bus->sram;
 
     return bus;
 }
 
 static u8 *bus_get_ptr(Bus *this, u32 addr)
 {
-    for (uint i = 0; i < len(this->map); ++i) {
-        u32 start = this->map[i].start;
-        if (in_range(addr, start, this->map[i].end)) {
-            return &this->map[i].mem[addr-start];
-        }
-    }
+    u32 idx = addr >> 24;
+    MemMap *region = &this->map[idx];
+    if (addr > region->end)
+        return NULL;
 
-    return NULL;
+    return &region->mem[addr - region->start];
 }
 
 u8 bus_read(Bus *this, u32 addr)
