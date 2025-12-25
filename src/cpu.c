@@ -2,12 +2,13 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include <SDL.h>
+
 #include "cpu.h"
 #include "thumb.h"
 #include "common.h"
 
 // declarations
-static int cond_pass(u32 opcode, u32 cpsr);
 static uint cpu_step_arm(Cpu *this);
 static u32 cpu_fetch_arm(Cpu *this);
 static void cpu_reset_pipeline(Cpu *this);
@@ -17,6 +18,7 @@ static uint cpu_execute_branch(Cpu *this, u32 opcode);
 static uint cpu_execute_alu(Cpu *this, u32 opcode);
 static uint cpu_execute_signed_transfer(Cpu *this, u32 opcode);
 static void cpu_build_decode_table(Cpu *this);
+static void cpu_build_condition_table(Cpu *this);
 
 static u32 compute_shift(Cpu *this, u32 opcode, u32 rm, u32 *carry);
 
@@ -73,6 +75,7 @@ Cpu *cpu_init(Bus *bus)
     cpu->pc_changed = 1;
 
     cpu_build_decode_table(cpu);
+    cpu_build_condition_table(cpu);
 
     return cpu;
 }
@@ -97,8 +100,12 @@ uint cpu_step_arm(Cpu *this)
 
     printf("%08X %08X ", reg(15) - 8, opcode);
 
+    // compute the index for the condition lookup table
+    u8 cond_idx = bits(opcode, 28, 4);
+    cond_idx |= bits(this->cpsr, 28, 4) << 4;
+
     // decode and execute
-    if (cond_pass(opcode, this->cpsr)) {
+    if (this->cond_pass[cond_idx]) {
         u32 index = (bits(opcode, 20, 8) << 4) | bits(opcode, 4, 4);
         cycles = this->decode[index](this, opcode);
     } else {
@@ -379,72 +386,74 @@ static void cpu_build_decode_table(Cpu *this)
     }
 }
 
-int cond_pass(u32 opcode, u32 cpsr)
+
+static void cpu_build_condition_table(Cpu *this)
 {
-    switch (bits(opcode, 28, 4)) {
-        case 0x0:
-            // EQ
-            return is_set(cpsr, PSR_BIT_Z);
-        break;
-        case 0x1:
-            // NE
-            return is_clear(cpsr, PSR_BIT_Z);
-        break;
-        case 0x2:
-            // CS
-            return is_set(cpsr, PSR_BIT_C);
-        break;
-        case 0x3:
-            // CC
-            return is_clear(cpsr, PSR_BIT_C);
-        break;
-        case 0x4:
-            // MI
-            return is_set(cpsr, PSR_BIT_N);
-        break;
-        case 0x5:
-            // PL
-            return is_clear(cpsr, PSR_BIT_N);
-        break;
-        case 0x6:
-            // VS
-            return is_set(cpsr, PSR_BIT_V);
-        break;
-        case 0x7:
-            // VC
-            return is_clear(cpsr, PSR_BIT_V);
-        break;
-        case 0x8:
-            // HI
-            return is_set(cpsr, PSR_BIT_C) && is_clear(cpsr, PSR_BIT_Z);
-        break;
-        case 0x9:
-            // LS
-            return is_clear(cpsr, PSR_BIT_C) && is_set(cpsr, PSR_BIT_Z);
-        break;
-        case 0xA:
-            // GE
-            return bit(cpsr, PSR_BIT_N) == bit(cpsr, PSR_BIT_V);
-        break;
-        case 0xB:
-            // LT
-            return bit(cpsr, PSR_BIT_N) != bit(cpsr, PSR_BIT_V);
-        break;
-        case 0xC:
-            // GT
-            return is_clear(cpsr, PSR_BIT_Z) && bit(cpsr, PSR_BIT_N) == bit(cpsr, PSR_BIT_V);
-        break;
-        case 0xD:
-            // LE
-            return is_clear(cpsr, PSR_BIT_Z) && bit(cpsr, PSR_BIT_N) != bit(cpsr, PSR_BIT_V);
-        break;
-        case 0xE:
-            // AL
-            return 1;
-        break;
+    for (uint idx = 0; idx < (1 << 8); ++idx) {
+        u32 cpsr = bits(idx, 4, 8) << 28;
+        switch (bits(idx, 0, 4)) {
+            case 0x0:
+                // EQ
+                this->cond_pass[idx] = is_set(cpsr, PSR_BIT_Z);
+            break;
+            case 0x1:
+                // NE
+                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_Z);
+            break;
+            case 0x2:
+                // CS
+                this->cond_pass[idx] = is_set(cpsr, PSR_BIT_C);
+            break;
+            case 0x3:
+                // CC
+                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_C);
+            break;
+            case 0x4:
+                // MI
+                this->cond_pass[idx] = is_set(cpsr, PSR_BIT_N);
+            break;
+            case 0x5:
+                // PL
+                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_N);
+            break;
+            case 0x6:
+                // VS
+                this->cond_pass[idx] = is_set(cpsr, PSR_BIT_V);
+            break;
+            case 0x7:
+                // VC
+                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_V);
+            break;
+            case 0x8:
+                // HI
+                this->cond_pass[idx] = is_set(cpsr, PSR_BIT_C) && is_clear(cpsr, PSR_BIT_Z);
+            break;
+            case 0x9:
+                // LS
+                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_C) && is_set(cpsr, PSR_BIT_Z);
+            break;
+            case 0xA:
+                // GE
+                this->cond_pass[idx] = bit(cpsr, PSR_BIT_N) == bit(cpsr, PSR_BIT_V);
+            break;
+            case 0xB:
+                // LT
+                this->cond_pass[idx] = bit(cpsr, PSR_BIT_N) != bit(cpsr, PSR_BIT_V);
+            break;
+            case 0xC:
+                // GT
+                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_Z) && bit(cpsr, PSR_BIT_N) == bit(cpsr, PSR_BIT_V);
+            break;
+            case 0xD:
+                // LE
+                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_Z) && bit(cpsr, PSR_BIT_N) != bit(cpsr, PSR_BIT_V);
+            break;
+            case 0xE:
+                // AL
+                this->cond_pass[idx] = 1;
+            break;
+        }
     }
-    assert(0);
-    return 1;
 }
 
 static u32 alu_and(u32 op1, u32 op2, u32 *cpsr)
