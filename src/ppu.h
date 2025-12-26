@@ -6,6 +6,7 @@
 typedef struct Ppu {
     SDL_Window *sdl_win;
     SDL_Renderer *sdl_ren;
+    SDL_Surface *sdl_frame;
 
     Bus *bus;
 
