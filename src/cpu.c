@@ -222,6 +222,9 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
         alu_opcode != 10 &&
         alu_opcode != 12 &&
         alu_opcode != 0 &&
+        alu_opcode != 2 &&
+        alu_opcode != 5 &&
+        alu_opcode != 15 &&
         alu_opcode != 8) {
         return 0;
     }
@@ -736,6 +739,7 @@ static u32 alu_eor(u32 op1, u32 op2, u32 *cpsr)
 static u32 alu_sub(u32 op1, u32 op2, u32 *cpsr)
 {
     puts("SUB");
+    return op1 - op2;
 }
 
 static u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr)
@@ -767,6 +771,7 @@ static u32 alu_add(u32 op1, u32 op2, u32 *cpsr)
 static u32 alu_adc(u32 op1, u32 op2, u32 *cpsr)
 {
     puts("ADC");
+    return op1 + op2 + bit(*cpsr, PSR_BIT_C);
 }
 
 static u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr)
@@ -839,6 +844,7 @@ static u32 alu_bic(u32 op1, u32 op2, u32 *cpsr)
 static u32 alu_mvn(u32 op1, u32 op2, u32 *cpsr)
 {
     puts("MVN");
+    return ~op1;
 }
 
 // I recommend not reading this thing
