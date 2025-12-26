@@ -50,7 +50,7 @@ void ppu_update(Ppu *this, u32 cycles)
                 if (this->ly == 160) {
                     this->state = PPU_STATE_VBLANK;
                     SDL_RenderPresent(this->sdl_ren);
-                    // enter vblank                              
+                    // enter vblank
                     // TODO: update LCD STAT
                 } else {
                     this->state = PPU_STATE_HDRAW;

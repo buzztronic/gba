@@ -388,7 +388,7 @@ static void cpu_build_decode_table(Cpu *this)
 static void cpu_build_condition_table(Cpu *this)
 {
     for (uint idx = 0; idx < (1 << 8); ++idx) {
-        u32 cpsr = bits(idx, 4, 8) << 28;
+        u32 cpsr = bits(idx, 4, 4) << 28;
         switch (bits(idx, 0, 4)) {
             case 0x0:
                 // EQ
