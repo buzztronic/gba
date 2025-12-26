@@ -4,7 +4,7 @@
 
 #define reg(n) (*this->reg[n])
 
-#define PSR_MASK_MODE 0x1F
+#define PSR_MASK_MODE 0xF
 #define PSR_BIT_T 5
 #define PSR_BIT_F 6
 #define PSR_BIT_I 7
@@ -13,7 +13,8 @@
 #define PSR_BIT_Z 30
 #define PSR_BIT_N 31
 
-enum Spsr_index {SPSR_FIQ, SPSR_SVC, SPSR_ABT, SPSR_IRQ, SPSR_UND};
+// SPSR_USR is just for padding
+enum Spsr_index {SPSR_USR, SPSR_FIQ, SPSR_SVC, SPSR_ABT, SPSR_IRQ, SPSR_UND};
 
 typedef struct Cpu {
     Bus *bus;
@@ -37,7 +38,7 @@ typedef struct Cpu {
 	u32 reg_und[2];
 	u32 reg_abt[2]; // NOTE: I think we don't need this
 
-    u32 spsr[5]; // indexed by Spsr_index
+    u32 spsr[6]; // indexed by Spsr_index
 	u32 cpsr;
 
     // pipeline state

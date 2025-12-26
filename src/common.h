@@ -12,7 +12,7 @@ typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
 
-#define DISABLE_PRINT
+//#define DISABLE_PRINT
 
 #ifdef DISABLE_PRINT
     #define printf(...)

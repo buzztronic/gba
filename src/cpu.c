@@ -15,6 +15,7 @@ static uint cpu_execute_not_implemented(Cpu *this, u32 opcode);
 static uint cpu_execute_branch(Cpu *this, u32 opcode);
 static uint cpu_execute_alu(Cpu *this, u32 opcode);
 static uint cpu_execute_signed_transfer(Cpu *this, u32 opcode);
+static uint cpu_execute_block_transfer(Cpu *this, u32 opcode);
 static void cpu_build_decode_table(Cpu *this);
 static void cpu_build_condition_table(Cpu *this);
 
@@ -347,6 +348,109 @@ static uint cpu_execute_signed_transfer(Cpu *this, u32 opcode)
     return 2;
 }
 
+static uint cpu_execute_block_transfer(Cpu *this, u32 opcode)
+{
+    puts("LD/ST Multiple");
+    u32 flag_p = bit(opcode, 24);
+    u32 flag_u = bit(opcode, 23);
+    u32 flag_s = bit(opcode, 22);
+    u32 flag_w = bit(opcode, 21);
+    u32 flag_l = bit(opcode, 20);
+    u32 rn = bits(opcode, 16, 4);
+
+    assert(rn != 15);
+
+    // TODO: clean up this implementation
+
+    int use_user_registers = 0;
+#define xreg(n) *(use_user_registers ? &this->reg_usr[n] : this->reg[n])
+
+    if (flag_s) {
+        // TODO: assert we are not in user mode
+        // TODO: can we be in system mode? because system mode doesn't have spsr
+
+        // STM with R15 in transfer list and S bit set (User bank transfer)
+        if ((!flag_l && bit(opcode, 15))) {
+            // TODO: assert write-back is not used
+
+            // use user register not current mode registers
+            use_user_registers = 1;
+        }
+
+        // R15 not in list and S bit set (User bank transfer)
+        if (!bit(opcode, 15)) {
+            // TODO: assert write-back is not used
+
+            // use user register not current mode registers
+            use_user_registers = 1;
+
+            // TODO: implemented the cursed behavior that happen when the
+            // instruction is LDM and you read from a banked register during
+            // the following cycle.
+        }
+    }
+
+    int do_not_write_back = 0;
+    u32 addr = xreg(rn);
+    for (u32 j = 0; j < 16; ++j) {
+        u32 i = j;
+        if (!flag_u)
+            i = 15-j;
+
+        if (is_clear(opcode, i))
+            continue;
+
+        // pre
+        if (flag_p) {
+            if (flag_u)
+                addr += 4;
+            else
+                addr -= 4;
+        }
+
+        if (flag_l) {
+            // load
+            xreg(i) = bus_read32(this->bus, addr);
+            if (i == 15) {
+                if (flag_s) {
+                    // CPSR = spsr_<mode>
+                    this->cpsr = this->spsr[this->cpsr & PSR_MASK_MODE];
+                }
+                this->pc_changed = 1;
+            }
+        } else {
+            // store
+            bus_write32(this->bus, addr, xreg(i));
+
+            // A STM which includes storing the base, with the base as the first register
+            // to be stored, will therefore store the unchanged value, whereas with the base second
+            // or later in the transfer order, will store the modified value
+            if (bit(opcode, rn)) {
+                if (i == rn && do_not_write_back == 0) {
+                    do_not_write_back = 1;
+                }
+            }
+        }
+
+        // post
+        if (!flag_p) {
+            if (flag_u)
+                addr += 4;
+            else
+                addr -= 4;
+        }
+    }
+
+    // write-back
+    if (flag_w) {
+        if (!do_not_write_back)
+            xreg(rn) = addr;
+    }
+
+#undef xreg
+    return 1;
+}
+
 static void cpu_build_decode_table(Cpu *this)
 {
     // TODO Clean up this mess
@@ -371,6 +475,10 @@ static void cpu_build_decode_table(Cpu *this)
                 this->decode[idx] = cpu_execute_alu;
                 continue;
             }
+        }
+        if (bits(opcode, 25, 3) == 4) {
+            this->decode[idx] = cpu_execute_block_transfer;
+            continue;
         }
         if (bit(opcode, 22) == 0 && bits(opcode, 11, 4) != 0) {
             // not signed transfer
