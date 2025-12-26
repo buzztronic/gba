@@ -16,6 +16,7 @@ static uint cpu_execute_branch(Cpu *this, u32 opcode);
 static uint cpu_execute_alu(Cpu *this, u32 opcode);
 static uint cpu_execute_signed_transfer(Cpu *this, u32 opcode);
 static uint cpu_execute_block_transfer(Cpu *this, u32 opcode);
+static uint cpu_execute_single_transfer(Cpu *this, u32 opcode);
 static void cpu_build_decode_table(Cpu *this);
 static void cpu_build_condition_table(Cpu *this);
 
@@ -451,6 +452,92 @@ static uint cpu_execute_block_transfer(Cpu *this, u32 opcode)
     return 1;
 }
 
+static uint cpu_execute_single_transfer(Cpu *this, u32 opcode)
+{
+    puts("LD/ST Single");
+
+    u32 flag_i = bit(opcode, 25);
+    u32 flag_p = bit(opcode, 24);
+    u32 flag_u = bit(opcode, 23);
+    u32 flag_b = bit(opcode, 22);
+    u32 flag_w = bit(opcode, 21);
+    u32 flag_l = bit(opcode, 20);
+    u32 rn = bits(opcode, 16, 4);
+    u32 rd = bits(opcode, 12, 4);
+
+    u32 addr = reg(rn);
+
+    u32 offset = opcode & 0xFFF;
+
+    // compute the offset
+    if (flag_i) {
+        u32 dummy;
+        u32 rm = opcode & 0xF;
+        offset = compute_shift(this, opcode, rm, &dummy);
+    }
+
+    // pre
+    if (flag_p) {
+        if (flag_u) {
+            addr += offset;
+        } else {
+            addr -= offset;
+        }
+    }
+
+    if (flag_l) {
+        // load
+        if (flag_b) {
+            // byte
+            reg(rd) = bus_read(this->bus, addr);
+        } else {
+            // word
+            if (addr % 4 != 0 && addr % 2 == 0) {
+                reg(rd) = bus_read16(this->bus, addr);
+                reg(rd) |= bus_read16(this->bus, addr-2) << 16;
+            } else {
+                reg(rd) = bus_read32(this->bus, addr);
+            }
+        }
+        if (rd == 15) {
+            this->pc_changed = 1;
+        }
+    } else {
+        // store
+        u32 data = reg(rd);
+        if (rd == 15)
+            data += 4;
+
+        if (flag_b) {
+            // byte
+            bus_write(this->bus, addr, data);
+        } else {
+            // word
+            bus_write32(this->bus, addr, data);
+        }
+    }
+
+    // post
+    if (!flag_p) {
+        if (flag_u) {
+            addr += offset;
+        } else {
+            addr -= offset;
+        }
+    }
+
+    // write-back
+    // FIXME: privileged mode curse
+    if (flag_w || !flag_p) {
+        reg(rn) = addr;
+        if (rn == 15) {
+            this->pc_changed = 1;
+        }
+    }
+
+    return 1;
+}
+
 static void cpu_build_decode_table(Cpu *this)
 {
     // TODO Clean up this mess
@@ -478,6 +565,15 @@ static void cpu_build_decode_table(Cpu *this)
         }
         if (bits(opcode, 25, 3) == 4) {
             this->decode[idx] = cpu_execute_block_transfer;
+            continue;
+        }
+        if (bits(opcode, 26, 2) == 1) {
+            if (bit(opcode, 25) & bit(opcode, 4)) {
+                // TODO: this is an undefined instruction
+                this->decode[idx] = cpu_execute_not_implemented;
+            } else {
+                this->decode[idx] = cpu_execute_single_transfer;
+            }
             continue;
         }
         if (bit(opcode, 22) == 0 && bits(opcode, 11, 4) != 0) {
