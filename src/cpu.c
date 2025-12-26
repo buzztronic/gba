@@ -17,6 +17,7 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode);
 static uint cpu_execute_signed_transfer(Cpu *this, u32 opcode);
 static uint cpu_execute_block_transfer(Cpu *this, u32 opcode);
 static uint cpu_execute_single_transfer(Cpu *this, u32 opcode);
+static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode);
 static void cpu_build_decode_table(Cpu *this);
 static void cpu_build_condition_table(Cpu *this);
 
@@ -538,6 +539,66 @@ static uint cpu_execute_single_transfer(Cpu *this, u32 opcode)
     return 1;
 }
 
+static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode)
+{
+    puts("PSR Transfer");
+    u32 flag_i = opcode & BIT_25;
+    u32 flag_psr = opcode & BIT_22;
+    u32 flag_op = opcode & BIT_21;
+
+    if (flag_op) {
+        // MSR : Status <-- Register
+        u32 flag_f = opcode & BIT_19;
+        u32 flag_s = opcode & BIT_18;
+        u32 flag_x = opcode & BIT_17;
+        u32 flag_c = opcode & BIT_16;
+        u32 rm = opcode & 0xF;
+        u32 rot_imm = (opcode >> 8) & 0xF;
+        u32 imm = opcode & 0xFF;
+
+        u32 op = reg(rm);
+        if (flag_i) {
+            op = ror32(imm, rot_imm * 2);
+        }
+
+        u32 byte_mask = 0;
+        u32 mask = 0;
+
+        if (flag_c)
+            byte_mask |= 0x000000FF;
+        if (flag_x)
+            byte_mask |= 0x0000FF00;
+        if (flag_s)
+            byte_mask |= 0x00FF0000;
+        if (flag_f)
+            byte_mask |= 0xFF000000;
+
+        if (flag_psr) {
+            mask = byte_mask & (0xF0000000 | 0x0000000F | 0x00000020);
+            this->spsr[this->cpsr & PSR_MASK_MODE] &= !mask;
+            this->spsr[this->cpsr & PSR_MASK_MODE] |= op & mask;
+        } else {
+            if ((this->cpsr & PSR_MASK_MODE) == 0x0) {
+                // in User Mode
+                mask = byte_mask & 0xF0000000;
+            } else {
+                mask = byte_mask & 0xF000000F;
+            }
+            this->cpsr &= !mask;
+            this->cpsr |= op & mask;
+        }
+    } else {
+        // MRS : Register <-- Status
+        u32 rd = (opcode >> 12) & 0xF;
+        if (flag_psr) {
+            reg(rd) = this->spsr[this->cpsr & PSR_MASK_MODE];
+        } else {
+            reg(rd) = this->cpsr;
+        }
+    }
+    return 1;
+}
+
 static void cpu_build_decode_table(Cpu *this)
 {
     // TODO Clean up this mess
@@ -558,6 +619,8 @@ static void cpu_build_decode_table(Cpu *this)
             // otherwise it is not an ALU instruction.
             if (bit(opcode, 25) == 0 && bit(opcode, 4) && bit(opcode, 7)) {
             } else if (bit(opcode, 20) == 0 && alu_opcode >= 8 && alu_opcode <= 11) {
+                this->decode[idx] = cpu_execute_psr_transfer;
+                continue;
             } else {
                 this->decode[idx] = cpu_execute_alu;
                 continue;
