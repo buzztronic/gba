@@ -659,35 +659,35 @@ static void cpu_build_condition_table(Cpu *this)
         switch (bits(idx, 0, 4)) {
             case 0x0:
                 // EQ
-                this->cond_pass[idx] = is_set(cpsr, PSR_BIT_Z);
+                this->cond_pass[idx] = !!is_set(cpsr, PSR_BIT_Z);
             break;
             case 0x1:
                 // NE
-                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_Z);
+                this->cond_pass[idx] = !!is_clear(cpsr, PSR_BIT_Z);
             break;
             case 0x2:
                 // CS
-                this->cond_pass[idx] = is_set(cpsr, PSR_BIT_C);
+                this->cond_pass[idx] = !!is_set(cpsr, PSR_BIT_C);
             break;
             case 0x3:
                 // CC
-                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_C);
+                this->cond_pass[idx] = !!is_clear(cpsr, PSR_BIT_C);
             break;
             case 0x4:
                 // MI
-                this->cond_pass[idx] = is_set(cpsr, PSR_BIT_N);
+                this->cond_pass[idx] = !!is_set(cpsr, PSR_BIT_N);
             break;
             case 0x5:
                 // PL
-                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_N);
+                this->cond_pass[idx] = !!is_clear(cpsr, PSR_BIT_N);
             break;
             case 0x6:
                 // VS
-                this->cond_pass[idx] = is_set(cpsr, PSR_BIT_V);
+                this->cond_pass[idx] = !!is_set(cpsr, PSR_BIT_V);
             break;
             case 0x7:
                 // VC
-                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_V);
+                this->cond_pass[idx] = !!is_clear(cpsr, PSR_BIT_V);
             break;
             case 0x8:
                 // HI
@@ -711,7 +711,7 @@ static void cpu_build_condition_table(Cpu *this)
             break;
             case 0xD:
                 // LE
-                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_Z) && bit(cpsr, PSR_BIT_N) != bit(cpsr, PSR_BIT_V);
+                this->cond_pass[idx] = !!is_set(cpsr, PSR_BIT_Z) || (bit(cpsr, PSR_BIT_N) != bit(cpsr, PSR_BIT_V));
             break;
             case 0xE:
                 // AL
