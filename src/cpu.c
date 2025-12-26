@@ -153,7 +153,7 @@ uint cpu_execute_branch(Cpu *this, u32 opcode)
         // branch with link
         printf("BL ");
 
-        reg(14) = reg(15) + 4;
+        reg(14) = reg(15) - 4;
     } else {
         printf("B ");
     }
