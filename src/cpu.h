@@ -14,7 +14,15 @@
 #define PSR_BIT_N 31
 
 // SPSR_USR is just for padding
-enum Spsr_index {SPSR_USR, SPSR_FIQ, SPSR_SVC, SPSR_ABT, SPSR_IRQ, SPSR_UND};
+enum CpuMode {
+    CPU_MODE_USR,
+    CPU_MODE_FIQ,
+    CPU_MODE_IRQ,
+    CPU_MODE_SVC,
+    CPU_MODE_ABT = 7,
+    CPU_MODE_UND = 11,
+    CPU_MODE_SYS = 15,
+};
 
 typedef struct Cpu {
     Bus *bus;
@@ -38,7 +46,7 @@ typedef struct Cpu {
 	u32 reg_und[2];
 	u32 reg_abt[2]; // NOTE: I think we don't need this
 
-    u32 spsr[6]; // indexed by Spsr_index
+    u32 spsr[16]; // indexed by cpsr [0:3]
 	u32 cpsr;
 
     // pipeline state

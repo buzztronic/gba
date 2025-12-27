@@ -10,6 +10,7 @@
 static uint cpu_step_arm(Cpu *this);
 static u32 cpu_fetch_arm(Cpu *this);
 static void cpu_reset_pipeline(Cpu *this);
+static void cpu_bank_registers(Cpu *this);
 
 static uint cpu_execute_not_implemented(Cpu *this, u32 opcode);
 static uint cpu_execute_branch(Cpu *this, u32 opcode);
@@ -170,6 +171,39 @@ void cpu_reset_pipeline(Cpu *this)
     reg(15) += 8;
 }
 
+static void cpu_bank_registers(Cpu *this)
+{
+    switch (bits(this->cpsr, 0, 4)) {
+        case CPU_MODE_SYS:
+        case CPU_MODE_USR:
+            for (uint i = 8; i < 15; ++i) {
+                this->reg[i] = &this->reg_usr[i];
+            }
+        break;
+        case CPU_MODE_FIQ:
+            for (uint i = 8; i < 15; ++i) {
+                this->reg[i] = &this->reg_fiq[i-8];
+            }
+        break;
+        case CPU_MODE_IRQ:
+            this->reg[13] = &this->reg_irq[0];
+            this->reg[14] = &this->reg_irq[1];
+        break;
+        case CPU_MODE_SVC:
+            this->reg[13] = &this->reg_svc[0];
+            this->reg[14] = &this->reg_svc[1];
+        break;
+        case CPU_MODE_ABT:
+            this->reg[13] = &this->reg_abt[0];
+            this->reg[14] = &this->reg_abt[1];
+        break;
+        case CPU_MODE_UND:
+            this->reg[13] = &this->reg_und[0];
+            this->reg[14] = &this->reg_und[1];
+        break;
+    }
+}
+
 
 uint cpu_execute_not_implemented(Cpu *this, u32 opcode)
 {
@@ -257,6 +291,7 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
     if (bit_s && rd == 15) {
         // TODO: assert we are not in user mode
         this->cpsr = this->spsr[this->cpsr & PSR_MASK_MODE];
+        cpu_bank_registers(this);
     } else if (bit_s) {
         this->cpsr = cpsr_copy;
 
@@ -444,6 +479,7 @@ static uint cpu_execute_block_transfer(Cpu *this, u32 opcode)
                 if (flag_s) {
                     // CPSR = spsr_<mode>
                     this->cpsr = this->spsr[this->cpsr & PSR_MASK_MODE];
+                    cpu_bank_registers(this);
                 }
                 this->pc_changed = 1;
             }
@@ -568,12 +604,12 @@ static uint cpu_execute_single_transfer(Cpu *this, u32 opcode)
 
 static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode)
 {
-    puts("PSR Transfer");
     u32 flag_i = opcode & BIT_25;
     u32 flag_psr = opcode & BIT_22;
     u32 flag_op = opcode & BIT_21;
 
     if (flag_op) {
+        puts("MSR");
         // MSR : Status <-- Register
         u32 flag_f = opcode & BIT_19;
         u32 flag_s = opcode & BIT_18;
@@ -601,20 +637,22 @@ static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode)
             byte_mask |= 0xFF000000;
 
         if (flag_psr) {
-            mask = byte_mask & (0xF0000000 | 0x0000000F | 0x00000020);
-            this->spsr[this->cpsr & PSR_MASK_MODE] &= !mask;
+            mask = byte_mask & 0xF000002F;
+            this->spsr[this->cpsr & PSR_MASK_MODE] &= ~mask;
             this->spsr[this->cpsr & PSR_MASK_MODE] |= op & mask;
         } else {
             if ((this->cpsr & PSR_MASK_MODE) == 0x0) {
-                // in User Mode
+                // in User Mode only condition flags can be changed
                 mask = byte_mask & 0xF0000000;
             } else {
                 mask = byte_mask & 0xF000000F;
             }
-            this->cpsr &= !mask;
+            this->cpsr &= ~mask;
             this->cpsr |= op & mask;
+            cpu_bank_registers(this);
         }
     } else {
+        puts("MRS");
         // MRS : Register <-- Status
         u32 rd = (opcode >> 12) & 0xF;
         if (flag_psr) {
