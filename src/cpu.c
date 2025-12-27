@@ -220,6 +220,12 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
         u32 imm = bits(opcode, 0, 8);
         u32 rot_imm = bits(opcode, 8, 4);
         op2 = ror32(imm, rot_imm * 2);
+        if (rot_imm != 0) {
+            if (bit(op2, 31))
+                set_bit(this->cpsr, PSR_BIT_C);
+            else
+                clear_bit(this->cpsr, PSR_BIT_C);
+        }
     } else {
         u32 rm = bits(opcode, 0, 4);
         u32 rm_val = reg(rm); // might change to PC + 12
