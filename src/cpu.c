@@ -250,15 +250,16 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
 
     puts(alu_mnemonic[alu_opcode]);
 
+    u32 shift_carry = bit(this->cpsr, PSR_BIT_C);
     if (bit_i) {
         u32 imm = bits(opcode, 0, 8);
         u32 rot_imm = bits(opcode, 8, 4);
         op2 = ror32(imm, rot_imm * 2);
         if (rot_imm != 0) {
             if (bit(op2, 31))
-                set_bit(this->cpsr, PSR_BIT_C);
+                shift_carry = 1;
             else
-                clear_bit(this->cpsr, PSR_BIT_C);
+                shift_carry = 0;
         }
     } else {
         u32 rm = bits(opcode, 0, 4);
@@ -272,14 +273,7 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
                 rn_val = reg(15) + 4;
         }
 
-        u32 shift_carry = 0;
         op2 = compute_shift(this, opcode, rm_val, &shift_carry);
-
-        if (shift_carry) {
-            set_bit(this->cpsr, PSR_BIT_C);
-        } else {
-            clear_bit(this->cpsr, PSR_BIT_C);
-        }
     }
 
 
@@ -294,6 +288,23 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
         cpu_bank_registers(this);
     } else if (bit_s) {
         this->cpsr = cpsr_copy;
+
+        switch (alu_opcode) {
+            case 0x0: // AND
+            case 0x1: // EOR
+            case 0x8: // TST
+            case 0x9: // TEQ
+            case 0xC: // ORR
+            case 0xD: // MOV
+            case 0xE: // BIC
+            case 0xF: // MVN
+                if (shift_carry) {
+                    set_bit(this->cpsr, PSR_BIT_C);
+                } else {
+                    clear_bit(this->cpsr, PSR_BIT_C);
+                }
+            break;
+        }
 
         // Zero
         if (result == 0) {
