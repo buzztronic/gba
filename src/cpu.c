@@ -93,6 +93,17 @@ Cpu *cpu_init(Bus *bus)
     *cpu->reg[15] = 0x8000000;
     *cpu->reg[13] = 0x3007F00;
 
+    cpu->spsr[CPU_MODE_SVC] = 0;
+    cpu->spsr[CPU_MODE_IRQ] = 0;
+    cpu->reg_svc[0] = 0x03007FE0;
+    cpu->reg_irq[0] = 0x03007FA0;
+    cpu->reg_svc[1] = 0;
+    cpu->reg_irq[1] = 0;
+
+    for (u32 i = 0x3007E00; i < 0x3008000; i++) {
+        bus_write(bus, i, 0);
+    }
+
     cpu->bus = bus;
     cpu->pc_changed = 1;
 
