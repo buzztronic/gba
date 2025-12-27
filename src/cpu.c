@@ -31,10 +31,6 @@ static u32 alu_add(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_adc(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_tst(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_teq(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_cmp(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_cmn(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_orr(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_mov(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_bic(u32 op1, u32 op2, u32 *cpsr);
@@ -48,14 +44,37 @@ static u32 (*alu[16])(u32 op1, u32 op2, u32 *cpsr) = {
     alu_adc,
     alu_sbc,
     alu_rsc,
-    alu_tst,
-    alu_teq,
-    alu_cmp,
-    alu_cmn,
+
+    alu_and, // tst
+    alu_eor, // teq
+    alu_sub, // cmp
+    alu_add, // cmn
+
     alu_orr,
     alu_mov,
     alu_bic,
     alu_mvn
+};
+
+static char *const alu_mnemonic[16] = {
+    "AND",
+    "EOR",
+    "SUB",
+    "RSB",
+    "ADD",
+    "ADC",
+    "SBC",
+    "RSC",
+
+    "TST",
+    "TEQ",
+    "CMP",
+    "CMN",
+
+    "ORR",
+    "MOV",
+    "BIC",
+    "MVN"
 };
 
 // functions
@@ -118,6 +137,7 @@ uint cpu_step_arm(Cpu *this)
         u32 index = (bits(opcode, 20, 8) << 4) | bits(opcode, 4, 4);
         cycles = this->decode[index](this, opcode);
     } else {
+        puts("COND Failed");
         cycles = 1;
     }
 
@@ -193,6 +213,8 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
     u32 op2 = 0;
     u32 result = 0;
 
+    puts(alu_mnemonic[alu_opcode]);
+
     if (bit_i) {
         u32 imm = bits(opcode, 0, 8);
         u32 rot_imm = bits(opcode, 8, 4);
@@ -223,19 +245,6 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
     // now we have calculated op2
     u32 cpsr_copy = this->cpsr;
     result = alu[alu_opcode](rn_val, op2, &cpsr_copy);
-
-    // return 0 when the alu_opcode is not implemented yet
-    if (alu_opcode != 13 &&
-        alu_opcode != 4 &&
-        alu_opcode != 10 &&
-        alu_opcode != 12 &&
-        alu_opcode != 0 &&
-        alu_opcode != 2 &&
-        alu_opcode != 5 &&
-        alu_opcode != 15 &&
-        alu_opcode != 8) {
-        return 0;
-    }
 
     // update cpsr
     if (bit_s && rd == 15) {
@@ -734,25 +743,38 @@ static void cpu_build_condition_table(Cpu *this)
 
 static u32 alu_and(u32 op1, u32 op2, u32 *cpsr)
 {
-    puts("AND");
-    (void)cpsr;
     return op1 & op2;
 }
 
 static u32 alu_eor(u32 op1, u32 op2, u32 *cpsr)
 {
-    puts("EOR");
+    return op1 ^ op2;
 }
 
 static u32 alu_sub(u32 op1, u32 op2, u32 *cpsr)
 {
-    puts("SUB");
-    return op1 - op2;
+    u32 result = op1 - op2;
+    u8 result_s = bit(result, 31);
+    u8 op1_s = bit(op1, 31);
+    u8 op2_s = bit(op2, 31);
+
+    if (!(op2 > op1)) {
+        set_bit(*cpsr, PSR_BIT_C);
+    } else {
+        clear_bit(*cpsr, PSR_BIT_C);
+    }
+
+    if (op1_s != op2_s && op1_s != result_s)
+        set_bit(*cpsr, PSR_BIT_V);
+    else
+        clear_bit(*cpsr, PSR_BIT_V);
+
+    return result;
 }
 
 static u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr)
 {
-    puts("RSB");
+    return alu_sub(op2, op1, cpsr);
 }
 
 static u32 alu_add(u32 op1, u32 op2, u32 *cpsr)
@@ -761,7 +783,6 @@ static u32 alu_add(u32 op1, u32 op2, u32 *cpsr)
     u8 result_s = !!(result & BIT_31);
     u8 op1_s = !!(op1 & BIT_31);
     u8 op2_s = !!(op2 & BIT_31);
-    puts("ADD");
 
     if (op1_s == op2_s && result_s != op1_s)
         set_bit(*cpsr, PSR_BIT_V);
@@ -778,81 +799,73 @@ static u32 alu_add(u32 op1, u32 op2, u32 *cpsr)
 
 static u32 alu_adc(u32 op1, u32 op2, u32 *cpsr)
 {
-    puts("ADC");
-    return op1 + op2 + bit(*cpsr, PSR_BIT_C);
+    u32 carry = bit(*cpsr, PSR_BIT_C);
+
+    if (carry == 0)
+        return alu_add(op1, op2, cpsr);
+
+    u32 sum = op1 + op2;
+    if (sum == ~(1 << 31)) {
+        set_bit(*cpsr, PSR_BIT_V);
+    } else {
+        clear_bit(*cpsr, PSR_BIT_V);
+    }
+
+    if (sum == ~0) {
+        set_bit(*cpsr, PSR_BIT_C);
+    } else {
+        clear_bit(*cpsr, PSR_BIT_C);
+    }
+
+    return sum + carry;
 }
 
 static u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr)
 {
-    puts("SBC");
+    u32 not_carry = !bit(*cpsr, PSR_BIT_C);
+
+    if (not_carry == 0)
+        return alu_sub(op1, op2, cpsr);
+
+    u32 diff = op1 - op2;
+    if (diff == (1 << 31)) {
+        set_bit(*cpsr, PSR_BIT_V);
+    } else {
+        clear_bit(*cpsr, PSR_BIT_V);
+    }
+
+    if (!(op1 <= op2)) {
+        set_bit(*cpsr, PSR_BIT_C);
+    } else {
+        clear_bit(*cpsr, PSR_BIT_C);
+    }
+
+    return diff - not_carry;
 }
 
 static u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr)
 {
-    puts("RSC");
-}
-
-static u32 alu_tst(u32 op1, u32 op2, u32 *cpsr)
-{
-    puts("TST");
-    return op1 & op2;
-}
-
-static u32 alu_teq(u32 op1, u32 op2, u32 *cpsr)
-{
-    puts("alu_teq");
-}
-
-static u32 alu_cmp(u32 op1, u32 op2, u32 *cpsr)
-{
-    u32 result = op1 - op2;
-    u8 result_s = !!(result & BIT_31);
-    u8 op1_s = !!(op1 & BIT_31);
-    u8 op2_s = !!(op2 & BIT_31);
-    puts("CMP");
-
-    if (op1 > op2)
-        set_bit(*cpsr, PSR_BIT_C);
-    else
-        clear_bit(*cpsr, PSR_BIT_C);
-
-    if (op1_s != op2_s && op1_s != result_s)
-        set_bit(*cpsr, PSR_BIT_V);
-    else
-        clear_bit(*cpsr, PSR_BIT_V);
-
-    return result;
-}
-
-static u32 alu_cmn(u32 op1, u32 op2, u32 *cpsr)
-{
-    puts("CMN");
+    return alu_sbc(op2, op1, cpsr);
 }
 
 static u32 alu_orr(u32 op1, u32 op2, u32 *cpsr)
 {
-    (void)cpsr;
-    puts("ORR");
     return op1 | op2;
 }
 
 static u32 alu_mov(u32 op1, u32 op2, u32 *cpsr)
 {
-    puts("MOV");
-    (void)op1;
-    (void)cpsr;
     return op2;
 }
 
 static u32 alu_bic(u32 op1, u32 op2, u32 *cpsr)
 {
-    puts("BIC");
+    return op1 & ~op2;
 }
 
 static u32 alu_mvn(u32 op1, u32 op2, u32 *cpsr)
 {
-    puts("MVN");
-    return ~op1;
+    return ~op2;
 }
 
 // I recommend not reading this thing
