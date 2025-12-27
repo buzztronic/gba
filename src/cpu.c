@@ -897,7 +897,7 @@ static u32 compute_shift(Cpu *this, u32 opcode, u32 rm, u32 *carry)
     u32 bit_r = bit(opcode, 4);
     u32 op2 = 0;
 
-    if (rs == 15) {
+    if (bit_r && rs == 15) {
         assert(0);
     }
 
@@ -980,7 +980,7 @@ static u32 compute_shift(Cpu *this, u32 opcode, u32 rm, u32 *carry)
     } else if (!bit_r && type == 3) {
         // Rotate right by immediate
         if (shift_imm == 0) {
-            op2 = (!(this->cpsr & PSR_BIT_C)) << 31;
+            op2 = bit(this->cpsr, PSR_BIT_C) << 31;
             op2 |= rm >> 1;
             *carry = bit(rm, 0);
         } else {
