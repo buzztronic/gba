@@ -267,9 +267,9 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
         // we might read PC+12 instead of PC+8
         if (bit(opcode, 4)) {
             if (rm == 15)
-                rm_val = reg(15) + 12;
+                rm_val = reg(15) + 4;
             if (rn == 15)
-                rn_val = reg(15) + 12;
+                rn_val = reg(15) + 4;
         }
 
         u32 shift_carry = 0;
