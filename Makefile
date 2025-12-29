@@ -8,8 +8,7 @@ DEPS = $(SRC:src/%.c=build/.src/%.d)
 CC   = gcc
 CFLAGS = \
 		 -g \
-		 -pg \
-		 -O0 \
+		 -Og \
 		 -Wall \
 		 -std=c99 \
 		 -pedantic \
@@ -18,7 +17,6 @@ CFLAGS = \
 		 `pkg-config --cflags sdl2`
 
 LDFLAGS = \
-		  -pg \
 		  `pkg-config --libs sdl2`
 
 all: info $(EXE)
