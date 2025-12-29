@@ -70,12 +70,16 @@ Bus *bus_init(const char *rom)
     bus->map[0xE].end = SRAM_ADDR + SRAM_SIZE;
     bus->map[0xE].mem = bus->sram;
 
+    bus->map[0xF].start = 0;
+    bus->map[0xF].end = 0;
+    bus->map[0xF].mem = NULL;
+
     return bus;
 }
 
 static u8 *bus_get_ptr(Bus *this, u32 addr)
 {
-    u32 idx = addr >> 24;
+    u32 idx = (addr >> 24) & 0xF;
     MemMap *region = &this->map[idx];
     if (addr > region->end)
         return NULL;

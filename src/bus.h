@@ -41,7 +41,7 @@ typedef struct Bus {
     u8 sram[SRAM_SIZE];
     u8 io[IO_SIZE];
 
-    MemMap map[0xE + 1];
+    MemMap map[0x10];
 
     // NOTE: for the moment everything is stored this strucut
     // including I/O registers but that will probably change later
