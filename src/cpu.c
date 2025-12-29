@@ -295,8 +295,12 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
     // update cpsr
     if (bit_s && rd == 15) {
         // TODO: assert we are not in user mode
-        this->cpsr = this->spsr[this->cpsr & PSR_MASK_MODE];
-        cpu_bank_registers(this);
+
+        // spsr_sys doesn't exist
+        if ((this->cpsr & PSR_MASK_MODE) != 0xF) {
+            this->cpsr = this->spsr[this->cpsr & PSR_MASK_MODE];
+            cpu_bank_registers(this);
+        }
     } else if (bit_s) {
         this->cpsr = cpsr_copy;
 
