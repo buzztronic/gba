@@ -391,15 +391,23 @@ static uint cpu_execute_signed_transfer(Cpu *this, u32 opcode)
         switch (bits_sh) {
             case 1:
                 // unsigned halfword
-                reg(rd) = bus_read16(this->bus, addr);
+                if (addr % 2) {
+                    reg(rd) = ror32(bus_read16(this->bus, addr-1), 8);
+                } else {
+                    reg(rd) = bus_read16(this->bus, addr);
+                }
             break;
             case 2:
                 // signed byte
-                reg(rd) = (i32)bus_read(this->bus, addr);
+                reg(rd) = (i8)bus_read(this->bus, addr);
             break;
             case 3:
                 // signed halfword
-                reg(rd) = (i32)bus_read16(this->bus, addr);
+                if (addr % 2) {
+                    reg(rd) = (i8)bus_read(this->bus, addr);
+                } else {
+                    reg(rd) = (i16)bus_read16(this->bus, addr);
+                }
             break;
         }
     } else {
@@ -407,7 +415,7 @@ static uint cpu_execute_signed_transfer(Cpu *this, u32 opcode)
         u32 data = reg(rd);
         if (rd == 15)
             data += 4;
-        bus_write16(this->bus, addr, data);
+        bus_write16(this->bus, addr & ~0x1, data);
     }
 
     // post-indexed
@@ -425,9 +433,11 @@ static uint cpu_execute_signed_transfer(Cpu *this, u32 opcode)
         // NOTE: write-back is always enabled when P=0 and W bit is not used
         // and must be 0
 
-        reg(rn) = addr;
-        if (rn == 15) {
-            assert(rn != 15);
+        if (!bit_l || rn != rd) {
+            reg(rn) = addr;
+            if (rn == 15) {
+                assert(rn != 15);
+            }
         }
     }
 
@@ -575,16 +585,19 @@ static uint cpu_execute_single_transfer(Cpu *this, u32 opcode)
         }
     }
 
+    // load
     if (flag_l) {
-        // load
         if (flag_b) {
             // byte
             reg(rd) = bus_read(this->bus, addr);
         } else {
             // word
-            if (addr % 4 != 0 && addr % 2 == 0) {
-                reg(rd) = bus_read16(this->bus, addr);
-                reg(rd) |= bus_read16(this->bus, addr-2) << 16;
+            if (addr & 0x3) {
+                // read at a word aligned address
+                reg(rd) = bus_read32(this->bus, addr & ~0x3);
+
+                // rotate such that lower byte of rd matches the addressed byte
+                reg(rd) = ror32(reg(rd), 8 * (addr % 4));
             } else {
                 reg(rd) = bus_read32(this->bus, addr);
             }
@@ -592,8 +605,10 @@ static uint cpu_execute_single_transfer(Cpu *this, u32 opcode)
         if (rd == 15) {
             this->pc_changed = 1;
         }
-    } else {
-        // store
+    }
+
+    // store
+    if (!flag_l) {
         u32 data = reg(rd);
         if (rd == 15)
             data += 4;
@@ -603,7 +618,7 @@ static uint cpu_execute_single_transfer(Cpu *this, u32 opcode)
             bus_write(this->bus, addr, data);
         } else {
             // word
-            bus_write32(this->bus, addr, data);
+            bus_write32(this->bus, addr & ~0x3, data);
         }
     }
 
@@ -617,11 +632,12 @@ static uint cpu_execute_single_transfer(Cpu *this, u32 opcode)
     }
 
     // write-back
-    // FIXME: privileged mode curse
     if (flag_w || !flag_p) {
-        reg(rn) = addr;
-        if (rn == 15) {
-            this->pc_changed = 1;
+        if (!flag_l || rn != rd) {
+            reg(rn) = addr;
+            if (rn == 15) {
+                this->pc_changed = 1;
+            }
         }
     }
 
