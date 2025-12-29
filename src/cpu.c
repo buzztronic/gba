@@ -20,6 +20,7 @@ static uint cpu_execute_block_transfer(Cpu *this, u32 opcode);
 static uint cpu_execute_single_transfer(Cpu *this, u32 opcode);
 static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode);
 static uint cpu_execute_branch_exchange(Cpu *this, u32 opcode);
+static uint cpu_execute_data_swap(Cpu *this, u32 opcode);
 static void cpu_build_decode_table(Cpu *this);
 static void cpu_build_condition_table(Cpu *this);
 
@@ -712,6 +713,43 @@ static uint cpu_execute_branch_exchange(Cpu *this, u32 opcode)
     return 0;
 }
 
+static uint cpu_execute_data_swap(Cpu *this, u32 opcode)
+{
+    puts("SWAP");
+    u32 rn = bits(opcode,  16, 4);
+    u32 rd = bits(opcode,  12, 4);
+    u32 rm = bits(opcode,  0, 4);
+
+    // TODO: assert: rn, rd and rm can't be r15
+
+    u32 ld_opcode = 0xe5900000; // ldr R0, [R0]
+    u32 st_opcode = 0xe5800000; // str R0, [R0]
+
+    ld_opcode |= opcode & (1 << 22);
+    ld_opcode |= rn << 16;
+    ld_opcode |= rd << 12;
+
+    st_opcode |= opcode & (1 << 22);
+    st_opcode |= rn << 16;
+    st_opcode |= rm << 12;
+
+    if (rm == rd) {
+        u32 rd1 = reg(rd);
+        cpu_execute_single_transfer(this, ld_opcode);
+
+        u32 rd2 = reg(rd);
+        reg(rd) = rd1;
+        cpu_execute_single_transfer(this, st_opcode);
+
+        reg(rd) = rd2;
+    } else {
+        cpu_execute_single_transfer(this, ld_opcode);
+        cpu_execute_single_transfer(this, st_opcode);
+    }
+
+    return 4;
+}
+
 static void cpu_build_decode_table(Cpu *this)
 {
     // TODO Clean up this mess
@@ -720,6 +758,10 @@ static void cpu_build_decode_table(Cpu *this)
         // bits[0:3] become bits[4:7]
         // bits[4:12] become bits[20:27]
         u32 opcode = (bits(idx, 4, 8) << 20) | (bits(idx, 0, 4) << 4);
+        if (bits(opcode, 23, 5) == 2 && bits(opcode, 20, 2) == 0 && bits(opcode, 4, 8) == 9) {
+            this->decode[idx] = cpu_execute_data_swap;
+            continue;
+        }
         if (bits(opcode, 20, 8) == 0x12 && bits(opcode, 4, 4) == 1) {
             this->decode[idx] = cpu_execute_branch_exchange;
             continue;
