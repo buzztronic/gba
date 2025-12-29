@@ -133,7 +133,7 @@ uint cpu_step_arm(Cpu *this)
 
     printf("%08X %08X ", reg(15) - 8, opcode);
 
-    if (reg(15)-8 == 0x08001D5C) {
+    if (reg(15)-8 == 0x08001A08) {
         // we failed at a test or passed all of them
         // now rom is vsyncing
         // failed test is stored in R12
@@ -693,15 +693,7 @@ static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode)
 static uint cpu_execute_branch_exchange(Cpu *this, u32 opcode)
 {
     puts("BX");
-    if (reg(15) - 8 != 0x0800028C) {
-        exit(0);
-    }
-
-    // Skip BX test in arm.gba
-    reg(15) = 0x080002A4;
-    this->pc_changed = 1;
-
-    return 1;
+    return 0;
 }
 
 static void cpu_build_decode_table(Cpu *this)
