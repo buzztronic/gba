@@ -136,14 +136,6 @@ uint cpu_step_arm(Cpu *this)
 
     printf("%08X %08X ", reg(15) - 8, opcode);
 
-    if (reg(15)-8 == 0x08001D6C) {
-        // we failed at a test or passed all of them
-        // now rom is vsyncing
-        // failed test is stored in R12
-        printf("Failed test %d\n", reg(12));
-        return 0;
-    }
-
     // compute the index for the condition lookup table
     u8 cond_idx = bits(opcode, 28, 4);
     cond_idx |= bits(this->cpsr, 28, 4) << 4;

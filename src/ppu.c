@@ -59,6 +59,7 @@ void ppu_update(Ppu *this, u32 cycles)
 
                     // enter vblank
                     // TODO: update LCD STAT
+                    bus_write(this->bus, IO_ADDR+4, 1);
                 } else {
                     this->state = PPU_STATE_HDRAW;
                 }
@@ -73,6 +74,7 @@ void ppu_update(Ppu *this, u32 cycles)
                     this->state = PPU_STATE_HDRAW;
                     // leave vblank
                     // TODO: update LCD STAT
+                    bus_write(this->bus, IO_ADDR+4, 0);
                 }
             }
         break;
@@ -87,7 +89,23 @@ void ppu_free(Ppu *this)
 
 static void ppu_draw_scaneline(Ppu *this)
 {
-    u8 *line = bus_getvram(this->bus) + this->ly * FRAME_W * 2;
-    u32 offset = this->ly * FRAME_W * 2;
-    memcpy((u8 *)this->sdl_frame->pixels + offset, line, FRAME_W * 2);
+    u8 mode = bus_read(this->bus, 0x4000000) & 7;
+    switch (mode) {
+        case 3: {
+            u32 offset = this->ly * FRAME_W * 2;
+            u8 *line = bus_getvram(this->bus) + this->ly * FRAME_W * 2;
+            memcpy((u8 *)this->sdl_frame->pixels + offset, line, FRAME_W * 2);
+        }
+        break;
+        case 4: {
+            u8 *line = bus_getvram(this->bus) + this->ly * FRAME_W;
+            u8 *pixels = (u8 *)this->sdl_frame->pixels + this->ly * FRAME_W * 2;
+            for (uint x = 0; x < FRAME_W; ++x) {
+                u16 color = bus_read16(this->bus, 0x05000000 + line[x] * 2);
+                pixels[x*2+0] = bits(color, 0, 8);
+                pixels[x*2+1] = bits(color, 8, 8);
+            }
+        }
+        break;
+    }
 }
