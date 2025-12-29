@@ -1,4 +1,4 @@
-ARGS = ./roms/tests/arm.gba
+ARGS = ./roms/tests/thumb.gba
 EXE  = gba
 
 SRC  = $(wildcard src/*.c)

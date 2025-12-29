@@ -9,3 +9,4 @@ roms/tests/*
 !roms/tests
 !roms/tests/panda.gba
 !roms/tests/arm.gba
+!roms/tests/thumb.gba

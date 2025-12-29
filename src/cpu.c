@@ -113,6 +113,9 @@ Cpu *cpu_init(Bus *bus)
     cpu_build_decode_table(cpu);
     cpu_build_condition_table(cpu);
 
+    void cpu_init_thumb(Cpu *this);
+    cpu_init_thumb(cpu);
+
     return cpu;
 }
 
@@ -733,11 +736,11 @@ static uint cpu_execute_branch_exchange(Cpu *this, u32 opcode)
     if (reg(rn) & 1) {
         // Switch to Thumb
         set_bit(this->cpsr, PSR_BIT_T);
-        puts("going thumb");
+        puts("SWITCH TO THUMB");
     } else {
         // Switch to ARM
         clear_bit(this->cpsr, PSR_BIT_T);
-        puts("going arm");
+        puts("SWITCH TO ARM");
     }
 
     return 1;

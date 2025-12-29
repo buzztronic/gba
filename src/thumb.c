@@ -1,9 +1,186 @@
 #include <stdio.h>
+#include <assert.h>
 
 #include "thumb.h"
 
-int cpu_step_thumb(Cpu *this)
+// declarations
+static u16 cpu_fetch_thumb(Cpu *this);
+static void cpu_reset_pipeline_thumb(Cpu *this);
+static void cpu_build_decode_table_thumb(Cpu *this);
+
+static uint thumb_execute_not_implemented(Cpu *this, u16 opcode);
+
+static const char *bin8_str(u8 data);
+static const char *bin16_str(u16 data);
+
+void cpu_init_thumb(Cpu *this)
 {
-    puts("Ooops, where are in THUMB state");
+    cpu_build_decode_table_thumb(this);
+}
+
+uint cpu_step_thumb(Cpu *this)
+{
+    u16 opcode = cpu_fetch_thumb(this);
+    uint cycles = 0;
+
+    printf("%08X %04X %s ", reg(15) - 4, opcode, bin8_str(opcode >> 8));
+
+    cycles = this->decode_arm[opcode >> 8](this, opcode);
+
+    return cycles;
+}
+
+static u16 cpu_fetch_thumb(Cpu *this)
+{
+    u16 opcode;
+
+    if (this->pc_changed) {
+        cpu_reset_pipeline_thumb(this);
+        this->pc_changed = 0;
+    } {
+        reg(15) += 2;
+    }
+
+    opcode = this->execute_opcode;
+    this->execute_opcode = this->decode_opcode;
+    this->decode_opcode = bus_read16(this->bus, reg(15));
+
+    return opcode;
+}
+
+static void cpu_reset_pipeline_thumb(Cpu *this)
+{
+    this->execute_opcode = bus_read16(this->bus, reg(15));
+    this->decode_opcode = bus_read16(this->bus, reg(15) + 2);
+    reg(15) += 4;
+}
+
+static void cpu_build_decode_table_thumb(Cpu *this)
+{
+    for (uint idx = 0; idx <= 0xFF; idx++) {
+        u16 opcode = idx << 8;
+        this->decode_arm[idx] = thumb_execute_not_implemented;
+        if (bits(opcode, 13, 3) == 0) {
+            if (bits(idx, 11, 2) != 3) {
+                // move shifted register
+            } else {
+                // Add/Sub
+            }
+            continue;
+        }
+
+        if (bits(opcode, 13, 3) == 1) {
+            // mov, cmp, add, sub immediate
+            continue;
+        }
+
+        if (bits(opcode, 10, 6) == 0x10) {
+            // ALU operation
+            continue;
+        }
+
+        if (bits(opcode, 10, 6) == 0x11) {
+            // Hi register operation
+            // bx
+            continue;
+        }
+
+
+        if (bits(opcode, 11, 5) == 9) {
+            // PC relative load
+            continue;
+        }
+
+        if (bits(opcode, 12, 4) == 5) {
+            if (bit(opcode, 9) == 0) {
+                // Load/store with register offset
+            } else {
+                // Load/store sign-extended byte/halfword
+            }
+            continue;
+        }
+
+        if (bits(opcode, 13, 3) == 3) {
+            // Load/store with immediate offset
+            continue;
+        }
+
+        if (bits(opcode, 12, 4) == 8) {
+            // Load/store halfword
+            continue;
+        }
+
+        if (bits(opcode, 12, 4) == 9) {
+            // SP-relative load/store
+            continue;
+        }
+
+        if (bits(opcode, 12, 4) == 10) {
+            // Load address
+            continue;
+        }
+
+        if (bits(opcode, 12, 4) == 11) {
+            if (bit(opcode, 10) == 0) {
+                // Add offset to stack pointer
+            } else {
+                // Push/pop registers
+            }
+            continue;
+        }
+
+        if (bits(opcode, 12, 4) == 12) {
+            // Multiple load/store
+            continue;
+        }
+
+        if (bits(opcode, 12, 4) == 13) {
+            if (bits(opcode, 8, 4) != 0xF) {
+                // Conditional branch
+            } else {
+                // Software Interrupt
+            }
+            continue;
+        }
+
+        if (bits(opcode, 12, 4) == 14) {
+            // Unconditional branch
+            continue;
+        }
+
+        if (bits(opcode, 12, 4) == 0xF) {
+            // Long branch with link
+            continue;
+        }
+
+        assert(0);
+    }
+}
+
+static uint thumb_execute_not_implemented(Cpu *this, u16 opcode)
+{
+    puts("Not Implemented");
     return 0;
+}
+
+static const char *bin16_str(u16 data)
+{
+    static char buff[] = "XXXX_XXXX_XXXX_XXXX";
+    for (int i = 18; i >= 0; i--) {
+        if (buff[i] == '_')
+            continue;
+        buff[i] = "01"[data & 1];
+    }
+    return buff;
+}
+
+static const char *bin8_str(u8 data)
+{
+    static char buff[] = "XXXX_XXXX";
+    for (int i = 8; i >= 0; i--) {
+        if (buff[i] == '_')
+            continue;
+        buff[i] = "01"[data & 1];
+    }
+    return buff;
 }

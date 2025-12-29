@@ -2,4 +2,4 @@
 
 #include "cpu.h"
 
-int cpu_step_thumb(Cpu *this);
+uint cpu_step_thumb(Cpu *this);
