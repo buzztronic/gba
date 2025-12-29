@@ -26,8 +26,8 @@ Ppu *ppu_init(Bus *bus)
         FRAME_W * WIN_SCALE,
         FRAME_H * WIN_SCALE,
         0);
-    //ppu->sdl_ren = SDL_CreateRenderer(ppu->sdl_win, -1, SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
-    ppu->sdl_ren = SDL_CreateRenderer(ppu->sdl_win, -1, SDL_RENDERER_ACCELERATED);
+    ppu->sdl_ren = SDL_CreateRenderer(ppu->sdl_win, -1, SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
+    //ppu->sdl_ren = SDL_CreateRenderer(ppu->sdl_win, -1, SDL_RENDERER_ACCELERATED);
     ppu->sdl_frame = SDL_CreateRGBSurfaceWithFormat(0, FRAME_W, FRAME_H, 15, SDL_PIXELFORMAT_BGR555);
 
     return ppu;

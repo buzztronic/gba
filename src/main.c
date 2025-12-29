@@ -55,8 +55,12 @@ int main(int argc, char **argv)
     Ppu *ppu = ppu_init(bus);
 
     u32 state = STATE_RUNNING;
+    u32 counter = 0;
     while (1) {
-        state = update_input(state);
+        if (counter == 10000) {
+            counter = 0;
+            state = update_input(state);
+        }
         if (state == STATE_PAUSED) {
             continue;
         } else if (state == STATE_QUIT) {
@@ -65,6 +69,7 @@ int main(int argc, char **argv)
 
         // proper timing will be implemented later
         int n = cpu_step(cpu);
+        counter += n;
 
         if (n == 0)
             break;
