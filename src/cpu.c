@@ -21,6 +21,8 @@ static uint cpu_execute_single_transfer(Cpu *this, u32 opcode);
 static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode);
 static uint cpu_execute_branch_exchange(Cpu *this, u32 opcode);
 static uint cpu_execute_data_swap(Cpu *this, u32 opcode);
+static uint cpu_execute_multiply(Cpu *this, u32 opcode);
+static uint cpu_execute_multiply_long(Cpu *this, u32 opcode);
 static void cpu_build_decode_table(Cpu *this);
 static void cpu_build_condition_table(Cpu *this);
 
@@ -134,7 +136,7 @@ uint cpu_step_arm(Cpu *this)
 
     printf("%08X %08X ", reg(15) - 8, opcode);
 
-    if (reg(15)-8 == 0x08001A08) {
+    if (reg(15)-8 == 0x08001D6C) {
         // we failed at a test or passed all of them
         // now rom is vsyncing
         // failed test is stored in R12
@@ -770,6 +772,99 @@ static uint cpu_execute_data_swap(Cpu *this, u32 opcode)
     return 4;
 }
 
+static uint cpu_execute_multiply(Cpu *this, u32 opcode)
+{
+    puts("MUL/MLA");
+    u32 rd = bits(opcode, 16, 4);
+    u32 rn = bits(opcode, 12, 4);
+    u32 rs = bits(opcode, 8, 4);
+    u32 rm = bits(opcode, 0, 4);
+    u32 bit_s = bit(opcode, 20);
+    u32 bit_a = bit(opcode, 21);
+
+    u32 result = 0;
+    if (bit_a) {
+        result = reg(rm) * reg(rs) + reg(rn);
+    } else {
+        result = reg(rm) * reg(rs);
+    }
+
+    reg(rd) = result;
+
+    if (!bit_s)
+        return 1;
+
+    // Zero
+    if (result == 0) {
+        set_bit(this->cpsr, PSR_BIT_Z);
+    } else {
+        clear_bit(this->cpsr, PSR_BIT_Z);
+    }
+
+    // Negative
+    if (bit(result, 31)) {
+        set_bit(this->cpsr, PSR_BIT_N);
+    } else {
+        clear_bit(this->cpsr, PSR_BIT_N);
+    }
+
+    return 1;
+}
+
+static uint cpu_execute_multiply_long(Cpu *this, u32 opcode)
+{
+    puts("MULL/MLAL");
+    u32 rdhi = bits(opcode, 16, 4);
+    u32 rdlo = bits(opcode, 12, 4);
+    u32 rs = bits(opcode, 8, 4);
+    u32 rm = bits(opcode, 0, 4);
+    u32 bit_s = bit(opcode, 20);
+    u32 bit_a = bit(opcode, 21);
+    u32 bit_u = bit(opcode, 22);
+
+    u64 result = 0;
+
+    // TODO: is it bad to use u64/i64?
+    // look for a method to do it with only u32/i32
+    if (bit_a) {
+        if (bit_u) {
+            result = (i64)(i32)reg(rm) * (i64)(i32)reg(rs);
+            result += ((u64)reg(rdhi) << 32) + reg(rdlo);
+        } else {
+            result = (u64)reg(rm) * reg(rs);
+            result += ((u64)reg(rdhi) << 32) + reg(rdlo);
+        }
+    } else{
+        if (bit_u) {
+            result = (i64)(i32)reg(rm) * (i64)(i32)reg(rs);
+        } else {
+            result = (u64)reg(rm) * reg(rs);
+        }
+    }
+
+    reg(rdhi) = result >> 32;
+    reg(rdlo) = result;
+
+    if (!bit_s)
+        return 1;
+
+    // Zero
+    if (result == 0) {
+        set_bit(this->cpsr, PSR_BIT_Z);
+    } else {
+        clear_bit(this->cpsr, PSR_BIT_Z);
+    }
+
+    // Negative
+    if ((i64)result < 0) {
+        set_bit(this->cpsr, PSR_BIT_N);
+    } else {
+        clear_bit(this->cpsr, PSR_BIT_N);
+    }
+
+    return 1;
+}
+
 static void cpu_build_decode_table(Cpu *this)
 {
     // TODO Clean up this mess
@@ -778,6 +873,14 @@ static void cpu_build_decode_table(Cpu *this)
         // bits[0:3] become bits[4:7]
         // bits[4:12] become bits[20:27]
         u32 opcode = (bits(idx, 4, 8) << 20) | (bits(idx, 0, 4) << 4);
+        if (bits(opcode, 22, 6) == 0 && bits(opcode, 4, 4) == 9) {
+            this->decode[idx] = cpu_execute_multiply;
+            continue;
+        }
+        if (bits(opcode, 23, 5) == 1 && bits(opcode, 4, 4) == 9) {
+            this->decode[idx] = cpu_execute_multiply_long;
+            continue;
+        }
         if (bits(opcode, 23, 5) == 2 && bits(opcode, 20, 2) == 0 && bits(opcode, 4, 8) == 9) {
             this->decode[idx] = cpu_execute_data_swap;
             continue;
