@@ -659,7 +659,7 @@ static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode)
             byte_mask |= 0xFF000000;
 
         if (flag_psr) {
-            mask = byte_mask & 0xF000002F;
+            mask = byte_mask & 0xF000003F;
             this->spsr[this->cpsr & PSR_MASK_MODE] &= ~mask;
             this->spsr[this->cpsr & PSR_MASK_MODE] |= op & mask;
         } else {
@@ -667,7 +667,7 @@ static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode)
                 // in User Mode only condition flags can be changed
                 mask = byte_mask & 0xF0000000;
             } else {
-                mask = byte_mask & 0xF000000F;
+                mask = byte_mask & 0xF000001F;
             }
             this->cpsr &= ~mask;
             this->cpsr |= op & mask;
