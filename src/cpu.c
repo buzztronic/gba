@@ -491,62 +491,82 @@ static uint cpu_execute_block_transfer(Cpu *this, u32 opcode)
         }
     }
 
-    int do_not_write_back = 0;
-    u32 addr = xreg(rn);
-    for (u32 j = 0; j < 16; ++j) {
-        u32 i = j;
-        if (!flag_u)
-            i = 15-j;
+    // number of registers to be transfered
+    u32 nreg = 0;
+    for (u32 i = 0; i < 16; ++i) {
+        nreg += bit(opcode, i);
+    }
 
-        if (is_clear(opcode, i))
+    // empty Rlist
+    if (nreg == 0) {
+        opcode |= 1 << 15;
+        nreg = 16;
+    }
+
+    // calculate the final value for the base register
+    u32 base = xreg(rn);
+    u32 addr = base;
+    if (flag_u) {
+        base += nreg * 4;
+    } else {
+        base -= nreg * 4;
+        addr = base;
+        flag_p = !flag_p;
+    }
+
+    // first register stored at the start of the second cycle
+    // base written at the end of the second cycle
+    u32 cycle = 1;
+    for (u32 i = 0; i < 16; ++i) {
+        if (is_clear(opcode, i)) {
             continue;
+        }
+
+        cycle ++;
 
         // pre
         if (flag_p) {
-            if (flag_u)
-                addr += 4;
-            else
-                addr -= 4;
+            addr += 4;
         }
 
+        // load
         if (flag_l) {
-            // load
             xreg(i) = bus_read32(this->bus, addr);
             if (i == 15) {
                 if (flag_s) {
                     // CPSR = spsr_<mode>
-                    this->cpsr = this->spsr[this->cpsr & PSR_MASK_MODE];
-                    cpu_bank_registers(this);
+                    // TODO: what if we are in system mode
+                    if ((this->cpsr & PSR_MASK_MODE) != 0xF) {
+                        this->cpsr = this->spsr[this->cpsr & PSR_MASK_MODE];
+                        cpu_bank_registers(this);
+                    }
                 }
                 this->pc_changed = 1;
             }
-        } else {
-            // store
-            bus_write32(this->bus, addr, xreg(i));
+        }
 
-            // A STM which includes storing the base, with the base as the first register
-            // to be stored, will therefore store the unchanged value, whereas with the base second
-            // or later in the transfer order, will store the modified value
-            if (bit(opcode, rn)) {
-                if (i == rn && do_not_write_back == 0) {
-                    do_not_write_back = 1;
-                }
+
+        // store
+        if (!flag_l) {
+            if (i == 15) {
+                bus_write32(this->bus, addr, xreg(i)+4);
+            } else {
+                bus_write32(this->bus, addr, xreg(i));
+            }
+        }
+
+        // write back at the end of the second cycle
+        if (cycle == 2 && flag_w) {
+            // if it is a load and loads the base then don't write back
+            if (!flag_l || !bit(opcode, rn)) {
+                xreg(rn) = base;
             }
         }
 
         // post
         if (!flag_p) {
-            if (flag_u)
-                addr += 4;
-            else
-                addr -= 4;
+            addr += 4;
         }
-    }
-
-    // write-back
-    if (flag_w) {
-        if (!do_not_write_back)
-            xreg(rn) = addr;
     }
 
 #undef xreg
