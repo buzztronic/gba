@@ -724,7 +724,23 @@ static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode)
 static uint cpu_execute_branch_exchange(Cpu *this, u32 opcode)
 {
     puts("BX");
-    return 0;
+
+    u32 rn = opcode & 0xF;
+
+    reg(15) = reg(rn);
+    this->pc_changed = 1;
+
+    if (reg(rn) & 1) {
+        // Switch to Thumb
+        set_bit(this->cpsr, PSR_BIT_T);
+        puts("going thumb");
+    } else {
+        // Switch to ARM
+        clear_bit(this->cpsr, PSR_BIT_T);
+        puts("going arm");
+    }
+
+    return 1;
 }
 
 static uint cpu_execute_data_swap(Cpu *this, u32 opcode)
