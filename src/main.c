@@ -57,7 +57,7 @@ int main(int argc, char **argv)
     u32 state = STATE_RUNNING;
     u32 counter = 0;
     while (1) {
-        if (counter == 10000) {
+        if (counter >= 10000) {
             counter = 0;
             state = update_input(state);
         }
