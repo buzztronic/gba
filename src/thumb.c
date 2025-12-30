@@ -13,9 +13,14 @@ static uint thumb_move_immediate(Cpu *this, u16 opcode);
 static uint thumb_cond_branch(Cpu *this, u16 opcode);
 static uint thumb_branch(Cpu *this, u16 opcode);
 static uint thumb_move_shifted_register(Cpu *this, u16 opcode);
+static uint thumb_add_sub(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
+
+// defined in cpu.c
+u32 alu_sub(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_add(u32 op1, u32 op2, u32 *cpsr);
 
 void cpu_update_zn(u32 result, u32 *cpsr);
 
@@ -72,6 +77,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
                 this->decode_arm[idx] = thumb_move_shifted_register;
             } else {
                 // Add/Sub
+                this->decode_arm[idx] = thumb_add_sub;
             }
             continue;
         }
@@ -179,10 +185,6 @@ static uint thumb_move_immediate(Cpu *this, u16 opcode)
     u32 rd = bits(opcode, 8, 3);
     u32 op = bits(opcode, 11, 2);
 
-    // defined in cpu.c
-    u32 alu_sub(u32 op1, u32 op2, u32 *cpsr);
-    u32 alu_add(u32 op1, u32 op2, u32 *cpsr);
-
     switch (op) {
         case 0:
             // MOV
@@ -284,6 +286,32 @@ static uint thumb_move_shifted_register(Cpu *this, u16 opcode)
         set_bit(this->cpsr, PSR_BIT_N);
     else
         clear_bit(this->cpsr, PSR_BIT_N);
+
+    return 1;
+}
+
+static uint thumb_add_sub(Cpu *this, u16 opcode)
+{
+    u32 rd = opcode & 7;
+    u32 rs = bits(opcode, 3, 3);
+    u32 op = bits(opcode, 6, 3);
+
+    if (!(opcode & BIT_10)) {
+        // register
+        op = reg(op);
+    }
+
+    if (opcode & BIT_9) {
+        // sub
+        puts("SUB");
+        reg(rd) = alu_sub(reg(rs), op, &this->cpsr);
+    } else {
+        // add
+        puts("ADD");
+        reg(rd) = alu_add(reg(rs), op, &this->cpsr);
+    }
+
+    cpu_update_zn(reg(rd), &this->cpsr);
 
     return 1;
 }
