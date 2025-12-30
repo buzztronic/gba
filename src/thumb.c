@@ -37,7 +37,7 @@ static u16 cpu_fetch_thumb(Cpu *this)
     if (this->pc_changed) {
         cpu_reset_pipeline_thumb(this);
         this->pc_changed = 0;
-    } {
+    } else {
         reg(15) += 2;
     }
 
