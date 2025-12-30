@@ -185,30 +185,35 @@ static uint thumb_move_immediate(Cpu *this, u16 opcode)
     u32 rd = bits(opcode, 8, 3);
     u32 op = bits(opcode, 11, 2);
 
+    u32 result = imm;
     switch (op) {
         case 0:
             // MOV
             puts("MOV");
-            reg(rd) = imm;
         break;
         case 1:
             // CMP
             puts("CMP");
-            alu_sub(reg(rd), imm, &this->cpsr);
+            result = alu_sub(reg(rd), imm, &this->cpsr);
         break;
         case 2:
             // ADD
             puts("ADD");
-            reg(rd) = alu_add(reg(rd), imm, &this->cpsr);
+            result = alu_add(reg(rd), imm, &this->cpsr);
         break;
         case 3:
             // SUB
             puts("SUB");
-            reg(rd) = alu_sub(reg(rd), imm, &this->cpsr);
+            result = alu_sub(reg(rd), imm, &this->cpsr);
         break;
     }
 
-    cpu_update_zn(reg(rd), &this->cpsr);
+    cpu_update_zn(result, &this->cpsr);
+
+    if (op != 1) {
+        reg(rd) = result;
+    }
+
     return 1;
 }
 
@@ -286,6 +291,8 @@ static uint thumb_move_shifted_register(Cpu *this, u16 opcode)
         set_bit(this->cpsr, PSR_BIT_N);
     else
         clear_bit(this->cpsr, PSR_BIT_N);
+
+    cpu_update_zn(reg(rd), &this->cpsr);
 
     return 1;
 }
