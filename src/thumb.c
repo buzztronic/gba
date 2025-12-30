@@ -11,6 +11,7 @@ static void cpu_build_decode_table_thumb(Cpu *this);
 static uint thumb_execute_not_implemented(Cpu *this, u16 opcode);
 static uint thumb_move_immediate(Cpu *this, u16 opcode);
 static uint thumb_cond_branch(Cpu *this, u16 opcode);
+static uint thumb_branch(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -151,6 +152,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 12, 4) == 14) {
             // Unconditional branch
+            this->decode_arm[idx] = thumb_branch;
             continue;
         }
 
@@ -218,6 +220,17 @@ static uint thumb_cond_branch(Cpu *this, u16 opcode)
 
         this->pc_changed = 1;
     }
+    return 1;
+}
+
+static uint thumb_branch(Cpu *this, u16 opcode)
+{
+    puts("B");
+    u32 offset = opcode & 0xFF;
+
+    reg(15) += ((i8)offset) * 2;
+    this->pc_changed = 1;
+
     return 1;
 }
 
