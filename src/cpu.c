@@ -26,7 +26,10 @@ static uint cpu_execute_multiply_long(Cpu *this, u32 opcode);
 static void cpu_build_decode_table(Cpu *this);
 static void cpu_build_condition_table(Cpu *this);
 
+
 static u32 compute_shift(Cpu *this, u32 opcode, u32 rm, u32 *carry);
+
+void cpu_update_zn(u32 result, u32 *cpsr);
 
 static u32 alu_and(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_eor(u32 op1, u32 op2, u32 *cpsr);
@@ -319,19 +322,7 @@ static uint cpu_execute_alu(Cpu *this, u32 opcode)
             break;
         }
 
-        // Zero
-        if (result == 0) {
-            set_bit(this->cpsr, PSR_BIT_Z);
-        } else {
-            clear_bit(this->cpsr, PSR_BIT_Z);
-        }
-
-        // Negative
-        if (bit(result, 31)) {
-            set_bit(this->cpsr, PSR_BIT_N);
-        } else {
-            clear_bit(this->cpsr, PSR_BIT_N);
-        }
+        cpu_update_zn(result, &this->cpsr);
     }
 
     // store result in Rd
@@ -805,19 +796,7 @@ static uint cpu_execute_multiply(Cpu *this, u32 opcode)
     if (!bit_s)
         return 1;
 
-    // Zero
-    if (result == 0) {
-        set_bit(this->cpsr, PSR_BIT_Z);
-    } else {
-        clear_bit(this->cpsr, PSR_BIT_Z);
-    }
-
-    // Negative
-    if (bit(result, 31)) {
-        set_bit(this->cpsr, PSR_BIT_N);
-    } else {
-        clear_bit(this->cpsr, PSR_BIT_N);
-    }
+    cpu_update_zn(result, &this->cpsr);
 
     return 1;
 }
@@ -1257,4 +1236,21 @@ static u32 compute_shift(Cpu *this, u32 opcode, u32 rm, u32 *carry)
     }
 
     return op2;
+}
+
+void cpu_update_zn(u32 result, u32 *cpsr)
+{
+    // Zero
+    if (result == 0) {
+        set_bit(*cpsr, PSR_BIT_Z);
+    } else {
+        clear_bit(*cpsr, PSR_BIT_Z);
+    }
+
+    // Negative
+    if (bit(result, 31)) {
+        set_bit(*cpsr, PSR_BIT_N);
+    } else {
+        clear_bit(*cpsr, PSR_BIT_N);
+    }
 }
