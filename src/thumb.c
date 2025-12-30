@@ -12,6 +12,7 @@ static uint thumb_execute_not_implemented(Cpu *this, u16 opcode);
 static uint thumb_move_immediate(Cpu *this, u16 opcode);
 static uint thumb_cond_branch(Cpu *this, u16 opcode);
 static uint thumb_branch(Cpu *this, u16 opcode);
+static uint thumb_move_shifted_register(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -66,8 +67,9 @@ static void cpu_build_decode_table_thumb(Cpu *this)
         u16 opcode = idx << 8;
         this->decode_arm[idx] = thumb_execute_not_implemented;
         if (bits(opcode, 13, 3) == 0) {
-            if (bits(idx, 11, 2) != 3) {
+            if (bits(opcode, 11, 2) != 3) {
                 // move shifted register
+                this->decode_arm[idx] = thumb_move_shifted_register;
             } else {
                 // Add/Sub
             }
@@ -230,6 +232,58 @@ static uint thumb_branch(Cpu *this, u16 opcode)
 
     reg(15) += ((i8)offset) * 2;
     this->pc_changed = 1;
+
+    return 1;
+}
+
+static uint thumb_move_shifted_register(Cpu *this, u16 opcode)
+{
+    u32 rd = opcode & 7;
+    u32 rs = bits(opcode, 3, 3);
+    u32 imm = bits(opcode, 6, 5);
+    u32 op = opcode >> 11;
+
+    u32 carry = this->cpsr & PSR_BIT_C;
+    if (op == 0) {
+        // LSL
+        puts("LSL");
+        if (imm == 0) {
+            reg(rd) = reg(rs);
+        } else {
+            carry = bit(reg(rs), 32 - imm);
+            reg(rd) = reg(rs) << imm;
+        }
+    } else if (op == 1) {
+        // LSR
+        puts("LSR");
+        if (imm == 0) {
+            carry = bit(reg(rs), 31);
+            reg(rd) = 0;
+        } else {
+            carry = bit(reg(rs), imm - 1);
+            reg(rd) = reg(rs) >> imm;
+        }
+    } else if (op == 2) {
+        // ASR
+        puts("ASR");
+        if (imm == 0) {
+            carry = bit(reg(rs), 31);
+            reg(rd) = carry ? 0xFFFFFFFF : 0;
+        } else {
+            carry = bit(reg(rs), imm - 1);
+            reg(rd) = ror32(reg(rs), imm);
+        }
+    }
+
+    if (carry)
+        set_bit(this->cpsr, PSR_BIT_C);
+    else
+        clear_bit(this->cpsr, PSR_BIT_C);
+
+    if (bit(reg(rd), 31))
+        set_bit(this->cpsr, PSR_BIT_N);
+    else
+        clear_bit(this->cpsr, PSR_BIT_N);
 
     return 1;
 }
