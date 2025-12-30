@@ -30,12 +30,12 @@ static void cpu_build_condition_table(Cpu *this);
 static u32 compute_shift(Cpu *this, u32 opcode, u32 rm, u32 *carry);
 
 void cpu_update_zn(u32 result, u32 *cpsr);
+u32 alu_sub(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_add(u32 op1, u32 op2, u32 *cpsr);
 
 static u32 alu_and(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_eor(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_sub(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_add(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_adc(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr);
 static u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr);
@@ -1003,7 +1003,7 @@ static u32 alu_eor(u32 op1, u32 op2, u32 *cpsr)
     return op1 ^ op2;
 }
 
-static u32 alu_sub(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_sub(u32 op1, u32 op2, u32 *cpsr)
 {
     u32 result = op1 - op2;
     u8 result_s = bit(result, 31);
@@ -1029,7 +1029,7 @@ static u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr)
     return alu_sub(op2, op1, cpsr);
 }
 
-static u32 alu_add(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_add(u32 op1, u32 op2, u32 *cpsr)
 {
     u32 result = op1 + op2;
     u8 result_s = !!(result & BIT_31);

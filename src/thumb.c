@@ -9,9 +9,12 @@ static void cpu_reset_pipeline_thumb(Cpu *this);
 static void cpu_build_decode_table_thumb(Cpu *this);
 
 static uint thumb_execute_not_implemented(Cpu *this, u16 opcode);
+static uint thumb_move_immediate(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
+
+void cpu_update_zn(u32 result, u32 *cpsr);
 
 void cpu_init_thumb(Cpu *this)
 {
@@ -71,6 +74,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 13, 3) == 1) {
             // mov, cmp, add, sub immediate
+            this->decode_arm[idx] = thumb_move_immediate;
             continue;
         }
 
@@ -161,6 +165,43 @@ static uint thumb_execute_not_implemented(Cpu *this, u16 opcode)
 {
     puts("Not Implemented");
     return 0;
+}
+
+static uint thumb_move_immediate(Cpu *this, u16 opcode)
+{
+    u32 imm = opcode & 0xFF;
+    u32 rd = bits(opcode, 8, 3);
+    u32 op = bits(opcode, 11, 2);
+
+    // defined in cpu.c
+    u32 alu_sub(u32 op1, u32 op2, u32 *cpsr);
+    u32 alu_add(u32 op1, u32 op2, u32 *cpsr);
+
+    switch (op) {
+        case 0:
+            // MOV
+            puts("MOV");
+            reg(rd) = imm;
+        break;
+        case 1:
+            // CMP
+            puts("CMP");
+            alu_sub(reg(rd), imm, &this->cpsr);
+        break;
+        case 2:
+            // ADD
+            puts("ADD");
+            reg(rd) = alu_add(reg(rd), imm, &this->cpsr);
+        break;
+        case 3:
+            // SUB
+            puts("SUB");
+            reg(rd) = alu_sub(reg(rd), imm, &this->cpsr);
+        break;
+    }
+
+    cpu_update_zn(reg(rd), &this->cpsr);
+    return 1;
 }
 
 static const char *bin16_str(u16 data)
