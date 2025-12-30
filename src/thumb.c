@@ -170,6 +170,7 @@ static const char *bin16_str(u16 data)
         if (buff[i] == '_')
             continue;
         buff[i] = "01"[data & 1];
+        data >>= 1;
     }
     return buff;
 }
@@ -181,6 +182,7 @@ static const char *bin8_str(u8 data)
         if (buff[i] == '_')
             continue;
         buff[i] = "01"[data & 1];
+        data >>= 1;
     }
     return buff;
 }
