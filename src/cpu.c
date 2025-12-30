@@ -168,15 +168,15 @@ u32 cpu_fetch_arm(Cpu *this)
 
     opcode = this->execute_opcode;
     this->execute_opcode = this->decode_opcode;
-    this->decode_opcode = bus_read32(this->bus, reg(15));
+    this->decode_opcode = bus_read32(this->bus, reg(15) & ~3);
 
     return opcode;
 }
 
 void cpu_reset_pipeline(Cpu *this)
 {
-    this->execute_opcode = bus_read32(this->bus, reg(15));
-    this->decode_opcode = bus_read32(this->bus, reg(15) + 4);
+    this->execute_opcode = bus_read32(this->bus, reg(15) & ~3);
+    this->decode_opcode = bus_read32(this->bus, (reg(15) & ~3) + 4);
     reg(15) += 8;
 }
 

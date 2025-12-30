@@ -43,15 +43,15 @@ static u16 cpu_fetch_thumb(Cpu *this)
 
     opcode = this->execute_opcode;
     this->execute_opcode = this->decode_opcode;
-    this->decode_opcode = bus_read16(this->bus, reg(15));
+    this->decode_opcode = bus_read16(this->bus, reg(15) & ~1);
 
     return opcode;
 }
 
 static void cpu_reset_pipeline_thumb(Cpu *this)
 {
-    this->execute_opcode = bus_read16(this->bus, reg(15));
-    this->decode_opcode = bus_read16(this->bus, reg(15) + 2);
+    this->execute_opcode = bus_read16(this->bus, reg(15) & ~1);
+    this->decode_opcode = bus_read16(this->bus, (reg(15) & ~1) + 2);
     reg(15) += 4;
 }
 
