@@ -10,6 +10,7 @@ static void cpu_build_decode_table_thumb(Cpu *this);
 
 static uint thumb_execute_not_implemented(Cpu *this, u16 opcode);
 static uint thumb_move_immediate(Cpu *this, u16 opcode);
+static uint thumb_cond_branch(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -26,7 +27,7 @@ uint cpu_step_thumb(Cpu *this)
     u16 opcode = cpu_fetch_thumb(this);
     uint cycles = 0;
 
-    printf("%08X %04X %s ", reg(15) - 4, opcode, bin8_str(opcode >> 8));
+    printf("%08X %04X %s ", (reg(15) & ~1) - 4, opcode, bin8_str(opcode >> 8));
 
     cycles = this->decode_arm[opcode >> 8](this, opcode);
 
@@ -141,6 +142,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
         if (bits(opcode, 12, 4) == 13) {
             if (bits(opcode, 8, 4) != 0xF) {
                 // Conditional branch
+                this->decode_arm[idx] = thumb_cond_branch;
             } else {
                 // Software Interrupt
             }
@@ -201,6 +203,21 @@ static uint thumb_move_immediate(Cpu *this, u16 opcode)
     }
 
     cpu_update_zn(reg(rd), &this->cpsr);
+    return 1;
+}
+
+static uint thumb_cond_branch(Cpu *this, u16 opcode)
+{
+    puts("B");
+    u32 cond_idx = bits(opcode, 8, 4);
+    cond_idx |= bits(this->cpsr, 28, 4) << 4;
+    if (this->cond_pass[cond_idx]) {
+        u32 offset = opcode & 0xFF;
+
+        reg(15) += ((i8)offset) * 2;
+
+        this->pc_changed = 1;
+    }
     return 1;
 }
 
