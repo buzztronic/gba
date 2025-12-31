@@ -16,6 +16,7 @@ static uint thumb_branch(Cpu *this, u16 opcode);
 static uint thumb_move_shifted_register(Cpu *this, u16 opcode);
 static uint thumb_add_sub(Cpu *this, u16 opcode);
 static uint thumb_alu(Cpu *this, u16 opcode);
+static uint thumb_branch_exchange(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -153,8 +154,12 @@ static void cpu_build_decode_table_thumb(Cpu *this)
         }
 
         if (bits(opcode, 10, 6) == 0x11) {
-            // Hi register operation
-            // bx
+            if (bits(opcode, 8, 2) == 3) {
+                // bx
+                this->decode_arm[idx] = thumb_branch_exchange;
+            } else {
+                // Hi register operation
+            }
             continue;
         }
 
@@ -396,6 +401,34 @@ static uint thumb_alu(Cpu *this, u16 opcode)
 
     if (op != 8 && op != 10 && op != 11) {
         reg(rd) = result;
+    }
+
+    return 1;
+}
+
+static uint thumb_branch_exchange(Cpu *this, u16 opcode)
+{
+    puts("BX");
+
+    u32 rs = bits(opcode, 3, 4);
+
+    if (rs == 15) {
+        rs = reg(15) & ~1;
+    } else {
+        rs = reg(rs);
+    }
+
+    reg(15) = rs;
+    this->pc_changed = 1;
+
+    if (rs & 1) {
+        // Switch to Thumb
+        set_bit(this->cpsr, PSR_BIT_T);
+        puts("SWITCH TO THUMB from thumb :)");
+    } else {
+        // Switch to ARM
+        clear_bit(this->cpsr, PSR_BIT_T);
+        puts("SWITCH TO ARM");
     }
 
     return 1;
