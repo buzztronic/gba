@@ -346,7 +346,7 @@ static uint thumb_move_shifted_register(Cpu *this, u16 opcode)
             reg(rd) = carry ? 0xFFFFFFFF : 0;
         } else {
             carry = bit(reg(rs), imm - 1);
-            reg(rd) = ror32(reg(rs), imm);
+            reg(rd) = asr32(reg(rs), imm);
         }
     }
 
