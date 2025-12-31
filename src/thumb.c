@@ -539,7 +539,30 @@ static u32 alu_lsr(u32 op1, u32 op2, u32 *cpsr)
 
 static u32 alu_asr(u32 op1, u32 op2, u32 *cpsr)
 {
-    return 0;
+    u32 result = op1;
+    u32 carry = bit(*cpsr, PSR_BIT_C);
+    u8 byte = bits(op2, 0, 8);
+
+    if (byte == 0) {
+        // unaffected
+    } else if (byte < 32) {
+        carry = bit(op1, byte - 1);
+        result = asr32(op1, byte);
+    } else {
+        carry = bit(op1, 31);
+        if (bit(op1, 31)) {
+            result = 0xFFFFFFFF;
+        } else {
+            result = 0;
+        }
+    }
+
+    if (carry)
+        set_bit(*cpsr, PSR_BIT_C);
+    else
+        clear_bit(*cpsr, PSR_BIT_C);
+
+    return result;
 }
 
 static u32 alu_ror(u32 op1, u32 op2, u32 *cpsr)
