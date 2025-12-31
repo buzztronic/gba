@@ -18,6 +18,7 @@ static uint thumb_add_sub(Cpu *this, u16 opcode);
 static uint thumb_alu(Cpu *this, u16 opcode);
 static uint thumb_branch_exchange(Cpu *this, u16 opcode);
 static uint thumb_hi_operation(Cpu *this, u16 opcode);
+static uint thumb_load_address(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -197,6 +198,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 12, 4) == 10) {
             // Load address
+            this->decode_thumb[idx] = thumb_load_address;
             continue;
         }
 
@@ -456,6 +458,22 @@ static uint thumb_hi_operation(Cpu *this, u16 opcode)
             puts("MOV HI");
             reg(rd) = reg(rs);
         break;
+    }
+
+    return 1;
+}
+
+static uint thumb_load_address(Cpu *this, u16 opcode)
+{
+    u32 imm = bits(opcode, 0, 8) << 2;
+    u8 rd = bits(opcode, 8, 3);
+
+    puts("ADR");
+
+    if (bit(opcode, 11)) {
+        reg(rd) = reg(13) + imm;
+    } else {
+        reg(rd) = (reg(15) & ~1) + imm;
     }
 
     return 1;
