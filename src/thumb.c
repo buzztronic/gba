@@ -485,12 +485,56 @@ static uint thumb_load_address(Cpu *this, u16 opcode)
 
 static u32 alu_lsl(u32 op1, u32 op2, u32 *cpsr)
 {
-    return 0;
+    u32 result = op1;
+    u32 carry = bit(*cpsr, PSR_BIT_C);
+    u8 byte = bits(op2, 0, 8);
+
+    if (byte == 0) {
+        // unaffected
+    } else if (byte < 32) {
+        carry = bit(op1, 32 - byte);
+        result = op1 << byte;
+    } else if (byte == 32) {
+        carry = bit(op1, 0);
+        result = 0;
+    } else {
+        carry = 0;
+        result = 0;
+    }
+
+    if (carry)
+        set_bit(*cpsr, PSR_BIT_C);
+    else
+        clear_bit(*cpsr, PSR_BIT_C);
+
+    return result;
 }
 
 static u32 alu_lsr(u32 op1, u32 op2, u32 *cpsr)
 {
-    return 0;
+    u32 result = op1;
+    u32 carry = bit(*cpsr, PSR_BIT_C);
+    u8 byte = bits(op2, 0, 8);
+
+    if (byte == 0) {
+        // unaffected
+    } else if (byte < 32) {
+        carry = bit(op1, byte - 1);
+        result = op1 >> byte;
+    } else if (byte == 32) {
+        carry = bit(op1, 31);
+        result = 0;
+    } else {
+        carry = 0;
+        result = 0;
+    }
+
+    if (carry)
+        set_bit(*cpsr, PSR_BIT_C);
+    else
+        clear_bit(*cpsr, PSR_BIT_C);
+
+    return result;
 }
 
 static u32 alu_asr(u32 op1, u32 op2, u32 *cpsr)
