@@ -244,6 +244,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 static uint thumb_execute_not_implemented(Cpu *this, u16 opcode)
 {
     puts("Not Implemented");
+    printf("R7: %d\n", reg(7));
     return 0;
 }
 
