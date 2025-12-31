@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #include "thumb.h"
 
@@ -14,6 +15,7 @@ static uint thumb_cond_branch(Cpu *this, u16 opcode);
 static uint thumb_branch(Cpu *this, u16 opcode);
 static uint thumb_move_shifted_register(Cpu *this, u16 opcode);
 static uint thumb_add_sub(Cpu *this, u16 opcode);
+static uint thumb_alu(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -21,8 +23,63 @@ static const char *bin16_str(u16 data);
 // defined in cpu.c
 u32 alu_sub(u32 op1, u32 op2, u32 *cpsr);
 u32 alu_add(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_and(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_eor(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_adc(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_orr(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_mov(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_bic(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_mvn(u32 op1, u32 op2, u32 *cpsr);
+
+static u32 alu_lsl(u32 op1, u32 op2, u32 *cpsr);
+static u32 alu_lsr(u32 op1, u32 op2, u32 *cpsr);
+static u32 alu_asr(u32 op1, u32 op2, u32 *cpsr);
+static u32 alu_ror(u32 op1, u32 op2, u32 *cpsr);
+static u32 alu_neg(u32 op1, u32 op2, u32 *cpsr);
+static u32 alu_mul(u32 op1, u32 op2, u32 *cpsr);
 
 void cpu_update_zn(u32 result, u32 *cpsr);
+
+static u32 (*alu_thumb[])(u32, u32, u32 *) = {
+    alu_and,
+    alu_eor,
+    alu_lsl,
+    alu_lsr,
+    alu_asr,
+    alu_adc,
+    alu_sbc,
+    alu_ror,
+    alu_and, // tst
+    alu_neg,
+    alu_sub, // cmp
+    alu_add, // cmn
+    alu_orr,
+    alu_mul,
+    alu_bic,
+    alu_mvn,
+};
+
+static const char *const alu_mnemonic_thumb[] = {
+    "AND",
+    "EOR",
+    "LSL",
+    "LSR",
+    "ASR",
+    "ADC",
+    "SBC",
+    "ROR",
+    "AND",
+    "NEG",
+    "SUB",
+    "ADD",
+    "ORR",
+    "MUL",
+    "BIC",
+    "MVN"
+};
 
 void cpu_init_thumb(Cpu *this)
 {
@@ -90,6 +147,8 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 10, 6) == 0x10) {
             // ALU operation
+            printf("ALU: %s\n", bin8_str(opcode >> 8));
+            this->decode_arm[idx] = thumb_alu;
             continue;
         }
 
@@ -321,6 +380,55 @@ static uint thumb_add_sub(Cpu *this, u16 opcode)
     cpu_update_zn(reg(rd), &this->cpsr);
 
     return 1;
+}
+
+static uint thumb_alu(Cpu *this, u16 opcode)
+{
+    u32 rd = opcode & 7;
+    u32 rs = bits(opcode, 3, 3);
+    u32 op = bits(opcode, 6, 4);
+
+    puts(alu_mnemonic_thumb[op]);
+
+    u32 result = alu_thumb[op](reg(rd), reg(rs), &this->cpsr);
+
+    cpu_update_zn(result, &this->cpsr);
+
+    if (op != 8 && op != 10 && op != 11) {
+        reg(rd) = result;
+    }
+
+    return 1;
+}
+
+static u32 alu_lsl(u32 op1, u32 op2, u32 *cpsr)
+{
+    return 0;
+}
+
+static u32 alu_lsr(u32 op1, u32 op2, u32 *cpsr)
+{
+    return 0;
+}
+
+static u32 alu_asr(u32 op1, u32 op2, u32 *cpsr)
+{
+    return 0;
+}
+
+static u32 alu_ror(u32 op1, u32 op2, u32 *cpsr)
+{
+    return 0;
+}
+
+static u32 alu_neg(u32 op1, u32 op2, u32 *cpsr)
+{
+    return 0;
+}
+
+static u32 alu_mul(u32 op1, u32 op2, u32 *cpsr)
+{
+    return 0;
 }
 
 static const char *bin16_str(u16 data)

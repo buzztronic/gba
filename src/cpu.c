@@ -33,16 +33,16 @@ void cpu_update_zn(u32 result, u32 *cpsr);
 u32 alu_sub(u32 op1, u32 op2, u32 *cpsr);
 u32 alu_add(u32 op1, u32 op2, u32 *cpsr);
 
-static u32 alu_and(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_eor(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_adc(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_orr(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_mov(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_bic(u32 op1, u32 op2, u32 *cpsr);
-static u32 alu_mvn(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_and(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_eor(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_adc(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_orr(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_mov(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_bic(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_mvn(u32 op1, u32 op2, u32 *cpsr);
 static u32 (*alu[16])(u32 op1, u32 op2, u32 *cpsr) = {
     alu_and,
     alu_eor,
@@ -993,12 +993,12 @@ static void cpu_build_condition_table(Cpu *this)
     }
 }
 
-static u32 alu_and(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_and(u32 op1, u32 op2, u32 *cpsr)
 {
     return op1 & op2;
 }
 
-static u32 alu_eor(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_eor(u32 op1, u32 op2, u32 *cpsr)
 {
     return op1 ^ op2;
 }
@@ -1024,7 +1024,7 @@ u32 alu_sub(u32 op1, u32 op2, u32 *cpsr)
     return result;
 }
 
-static u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr)
 {
     return alu_sub(op2, op1, cpsr);
 }
@@ -1049,7 +1049,7 @@ u32 alu_add(u32 op1, u32 op2, u32 *cpsr)
     return result;
 }
 
-static u32 alu_adc(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_adc(u32 op1, u32 op2, u32 *cpsr)
 {
     u32 carry = bit(*cpsr, PSR_BIT_C);
 
@@ -1072,7 +1072,7 @@ static u32 alu_adc(u32 op1, u32 op2, u32 *cpsr)
     return sum + carry;
 }
 
-static u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr)
 {
     u32 not_carry = !bit(*cpsr, PSR_BIT_C);
 
@@ -1095,27 +1095,27 @@ static u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr)
     return diff - not_carry;
 }
 
-static u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr)
 {
     return alu_sbc(op2, op1, cpsr);
 }
 
-static u32 alu_orr(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_orr(u32 op1, u32 op2, u32 *cpsr)
 {
     return op1 | op2;
 }
 
-static u32 alu_mov(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_mov(u32 op1, u32 op2, u32 *cpsr)
 {
     return op2;
 }
 
-static u32 alu_bic(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_bic(u32 op1, u32 op2, u32 *cpsr)
 {
     return op1 & ~op2;
 }
 
-static u32 alu_mvn(u32 op1, u32 op2, u32 *cpsr)
+u32 alu_mvn(u32 op1, u32 op2, u32 *cpsr)
 {
     return ~op2;
 }
