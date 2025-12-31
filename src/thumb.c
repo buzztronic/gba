@@ -17,6 +17,7 @@ static uint thumb_move_shifted_register(Cpu *this, u16 opcode);
 static uint thumb_add_sub(Cpu *this, u16 opcode);
 static uint thumb_alu(Cpu *this, u16 opcode);
 static uint thumb_branch_exchange(Cpu *this, u16 opcode);
+static uint thumb_hi_operation(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -159,6 +160,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
                 this->decode_arm[idx] = thumb_branch_exchange;
             } else {
                 // Hi register operation
+                this->decode_arm[idx] = thumb_hi_operation;
             }
             continue;
         }
@@ -429,6 +431,31 @@ static uint thumb_branch_exchange(Cpu *this, u16 opcode)
         // Switch to ARM
         clear_bit(this->cpsr, PSR_BIT_T);
         puts("SWITCH TO ARM");
+    }
+
+    return 1;
+}
+
+static uint thumb_hi_operation(Cpu *this, u16 opcode)
+{
+    u8 rs = bits(opcode, 3, 4);
+    u8 rd = (bit(opcode, 7) << 3) | bits(opcode, 0, 3);
+    u8 op = bits(opcode, 8, 2);
+
+    u32 dummy;
+    switch (op) {
+        case 0:
+            puts("ADD HI");
+            reg(rd) = alu_add(reg(rd), reg(rs), &dummy);
+        break;
+        case 1:
+            puts("CMP HI");
+            alu_sub(reg(rd), reg(rs), &this->cpsr);
+        break;
+        case 2:
+            puts("MOV HI");
+            reg(rd) = reg(rs);
+        break;
     }
 
     return 1;
