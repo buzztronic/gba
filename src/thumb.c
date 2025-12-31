@@ -95,7 +95,7 @@ uint cpu_step_thumb(Cpu *this)
 
     printf("%08X %04X %s ", (reg(15) & ~1) - 4, opcode, bin8_str(opcode >> 8));
 
-    cycles = this->decode_arm[opcode >> 8](this, opcode);
+    cycles = this->decode_thumb[opcode >> 8](this, opcode);
 
     return cycles;
 }
@@ -129,38 +129,38 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 {
     for (uint idx = 0; idx <= 0xFF; idx++) {
         u16 opcode = idx << 8;
-        this->decode_arm[idx] = thumb_execute_not_implemented;
+        this->decode_thumb[idx] = thumb_execute_not_implemented;
         if (bits(opcode, 13, 3) == 0) {
             if (bits(opcode, 11, 2) != 3) {
                 // move shifted register
-                this->decode_arm[idx] = thumb_move_shifted_register;
+                this->decode_thumb[idx] = thumb_move_shifted_register;
             } else {
                 // Add/Sub
-                this->decode_arm[idx] = thumb_add_sub;
+                this->decode_thumb[idx] = thumb_add_sub;
             }
             continue;
         }
 
         if (bits(opcode, 13, 3) == 1) {
             // mov, cmp, add, sub immediate
-            this->decode_arm[idx] = thumb_move_immediate;
+            this->decode_thumb[idx] = thumb_move_immediate;
             continue;
         }
 
         if (bits(opcode, 10, 6) == 0x10) {
             // ALU operation
             printf("ALU: %s\n", bin8_str(opcode >> 8));
-            this->decode_arm[idx] = thumb_alu;
+            this->decode_thumb[idx] = thumb_alu;
             continue;
         }
 
         if (bits(opcode, 10, 6) == 0x11) {
             if (bits(opcode, 8, 2) == 3) {
                 // bx
-                this->decode_arm[idx] = thumb_branch_exchange;
+                this->decode_thumb[idx] = thumb_branch_exchange;
             } else {
                 // Hi register operation
-                this->decode_arm[idx] = thumb_hi_operation;
+                this->decode_thumb[idx] = thumb_hi_operation;
             }
             continue;
         }
@@ -217,7 +217,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
         if (bits(opcode, 12, 4) == 13) {
             if (bits(opcode, 8, 4) != 0xF) {
                 // Conditional branch
-                this->decode_arm[idx] = thumb_cond_branch;
+                this->decode_thumb[idx] = thumb_cond_branch;
             } else {
                 // Software Interrupt
             }
@@ -226,7 +226,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 12, 4) == 14) {
             // Unconditional branch
-            this->decode_arm[idx] = thumb_branch;
+            this->decode_thumb[idx] = thumb_branch;
             continue;
         }
 

@@ -29,7 +29,7 @@ typedef struct Cpu {
 
     // decoding look up table
     uint (*decode[1 << 12]) (struct Cpu *, u32);
-    uint (*decode_arm[1 << 8]) (struct Cpu *, u16);
+    uint (*decode_thumb[1 << 8]) (struct Cpu *, u16);
 
     // lookup table to check for conditions
     // low nibble = condition code from the instruction
