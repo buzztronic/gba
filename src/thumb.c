@@ -460,6 +460,10 @@ static uint thumb_hi_operation(Cpu *this, u16 opcode)
         break;
     }
 
+    if (rd == 15 && op != 1) {
+        this->pc_changed = 1;
+    }
+
     return 1;
 }
 
