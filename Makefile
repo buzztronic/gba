@@ -1,4 +1,4 @@
-ARGS = ./roms/tests/thumb.gba
+ARGS = ./roms/games/doom.gba ./roms/bios.bin
 EXE  = gba
 
 SRC  = $(wildcard src/*.c)

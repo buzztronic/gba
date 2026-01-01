@@ -47,7 +47,7 @@ typedef struct Bus {
     // including I/O registers but that will probably change later
 } Bus;
 
-Bus *bus_init(const char *rom);
+Bus *bus_init(const char *rom, const char *bios);
 
 u8 bus_read(Bus *this, u32 addr);
 void bus_write(Bus *this, u32 addr, u8 data);

@@ -43,14 +43,14 @@ u32 update_input(u32 state)
 
 int main(int argc, char **argv)
 {
-    if (argc < 2) {
-        puts("usage: gba ROM");
+    if (argc < 3) {
+        puts("usage: gba ROM BIOS");
         return 1;
     }
 
     SDL_Init(SDL_INIT_EVERYTHING);
 
-    Bus *bus = bus_init(argv[1]);
+    Bus *bus = bus_init(argv[1], argv[2]);
     Cpu *cpu = cpu_init(bus);
     Ppu *ppu = ppu_init(bus);
 

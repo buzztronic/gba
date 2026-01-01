@@ -7,11 +7,12 @@ static void bus_load_bios(Bus *this, const char *bios);
 static void bus_load_rom(Bus *this, const char *rom);
 static u8 *bus_get_ptr(Bus *this, u32 addr);
 
-Bus *bus_init(const char *rom)
+Bus *bus_init(const char *rom, const char *bios)
 {
     Bus *bus = malloc(sizeof(Bus));
 
     bus_load_rom(bus, rom);
+    bus_load_bios(bus, bios);
 
     bus->map[0].start = BIOS_ADDR;
     bus->map[0].end = BIOS_ADDR + BIOS_SIZE;
