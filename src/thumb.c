@@ -611,7 +611,17 @@ static u32 alu_ror(u32 op1, u32 op2, u32 *cpsr)
 
 static u32 alu_neg(u32 op1, u32 op2, u32 *cpsr)
 {
-    return 0;
+    if (op2 == 0)
+        set_bit(*cpsr, PSR_BIT_C);
+    else
+        clear_bit(*cpsr, PSR_BIT_C);
+
+    if (op2 == ~0)
+        set_bit(*cpsr, PSR_BIT_V);
+    else
+        clear_bit(*cpsr, PSR_BIT_V);
+
+    return -op2;
 }
 
 static u32 alu_mul(u32 op1, u32 op2, u32 *cpsr)
