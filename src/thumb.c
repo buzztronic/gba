@@ -24,6 +24,7 @@ static uint thumb_branch_link(Cpu *this, u16 opcode);
 static uint thumb_load_pc_relative(Cpu *this, u16 opcode);
 static uint thumb_ldst_register_offset(Cpu *this, u16 opcode);
 static uint thumb_ldst_signed(Cpu *this, u16 opcode);
+static uint thumb_ldst_immediate(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -192,6 +193,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 13, 3) == 3) {
             // Load/store with immediate offset
+            this->decode_thumb[idx] = thumb_ldst_immediate;
             continue;
         }
 
@@ -631,6 +633,55 @@ static uint thumb_ldst_signed(Cpu *this, u16 opcode)
             } else {
                 reg(rd) = (i16)bus_read16(this->bus, addr);
             }
+        break;
+    }
+
+    return 1;
+}
+
+static uint thumb_ldst_immediate(Cpu *this, u16 opcode)
+{
+    u8 rd = bits(opcode, 0, 3);
+    u8 rb = bits(opcode, 3, 3);
+    u8 op = bits(opcode, 11, 2);
+    u32 addr = bits(opcode, 6, 5);
+
+    if (bit(opcode, 12) == 0)
+        addr <<= 2;
+
+    addr += reg(rb);
+
+    switch (op) {
+        // STR
+        case 0:
+            puts("STR");
+            bus_write32(this->bus, addr & ~3, reg(rd));
+        break;
+
+        // LDR
+        case 1:
+            puts("LDR");
+            if (addr & 0x3) {
+                // read at a word aligned address
+                reg(rd) = bus_read32(this->bus, addr & ~0x3);
+
+                // rotate such that lower byte of rd matches the addressed byte
+                reg(rd) = ror32(reg(rd), 8 * (addr % 4));
+            } else {
+                reg(rd) = bus_read32(this->bus, addr);
+            }
+        break;
+
+        // STRB
+        case 2:
+            puts("STRB");
+            bus_write(this->bus, addr, reg(rd));
+        break;
+
+        // LDRB
+        case 3:
+            puts("LDRB");
+            reg(rd) = bus_read(this->bus, addr);
         break;
     }
 
