@@ -23,6 +23,7 @@ static uint thumb_add_stack_pointer(Cpu *this, u16 opcode);
 static uint thumb_branch_link(Cpu *this, u16 opcode);
 static uint thumb_load_pc_relative(Cpu *this, u16 opcode);
 static uint thumb_ldst_register_offset(Cpu *this, u16 opcode);
+static uint thumb_ldst_signed(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -184,6 +185,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
                 this->decode_thumb[idx] = thumb_ldst_register_offset;
             } else {
                 // Load/store sign-extended byte/halfword
+                this->decode_thumb[idx] = thumb_ldst_signed;
             }
             continue;
         }
@@ -588,6 +590,48 @@ static uint thumb_ldst_register_offset(Cpu *this, u16 opcode)
             puts("STR");
             bus_write32(this->bus, addr & ~0x3, reg(rd));
         }
+    }
+
+    return 1;
+}
+
+static uint thumb_ldst_signed(Cpu *this, u16 opcode)
+{
+    u8 op = bits(opcode, 10, 2);
+    u8 rd = bits(opcode, 0, 3);
+    u8 rb = bits(opcode, 3, 3);
+    u8 ro = bits(opcode, 6, 3);
+
+    u32 addr = reg(rb) + reg(ro);
+
+    switch (op) {
+        // STRH
+        case 0:
+            bus_write16(this->bus, addr & ~0x1, reg(rd));
+        break;
+
+        // LDSB
+        case 1:
+            reg(rd) = (i8)bus_read(this->bus, addr);
+        break;
+
+        // LDRH
+        case 2:
+            if (addr % 2) {
+                reg(rd) = ror32(bus_read16(this->bus, addr-1), 8);
+            } else {
+                reg(rd) = bus_read16(this->bus, addr);
+            }
+        break;
+
+        // LDSH
+        case 3:
+            if (addr % 2) {
+                reg(rd) = (i8)bus_read(this->bus, addr);
+            } else {
+                reg(rd) = (i16)bus_read16(this->bus, addr);
+            }
+        break;
     }
 
     return 1;
