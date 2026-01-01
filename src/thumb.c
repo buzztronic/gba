@@ -20,6 +20,7 @@ static uint thumb_branch_exchange(Cpu *this, u16 opcode);
 static uint thumb_hi_operation(Cpu *this, u16 opcode);
 static uint thumb_load_address(Cpu *this, u16 opcode);
 static uint thumb_add_stack_pointer(Cpu *this, u16 opcode);
+static uint thumb_branch_link(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -237,6 +238,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 12, 4) == 0xF) {
             // Long branch with link
+            this->decode_thumb[idx] = thumb_branch_link;
             continue;
         }
 
@@ -497,6 +499,28 @@ static uint thumb_add_stack_pointer(Cpu *this, u16 opcode)
         reg(13) -= offset;
     } else {
         reg(13) += offset;
+    }
+
+    return 1;
+}
+
+static uint thumb_branch_link(Cpu *this, u16 opcode)
+{
+    if (bit(opcode, 11) == 0) {
+        puts("BLL");
+        u32 offset = bits(opcode, 0, 11);
+        if (bit(offset, 10)) {
+            offset |= ~(u32)0  << 11;
+        }
+        offset <<= 12;
+        reg(14) = reg(15) + offset;
+    } else {
+        puts("BLH");
+        u32 pc = reg(15);
+
+        reg(15) = reg(14) + (bits(opcode, 0, 11) << 1);
+        reg(14) = (pc - 2) | 1;
+        this->pc_changed = 1;
     }
 
     return 1;
