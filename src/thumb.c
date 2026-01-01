@@ -626,7 +626,7 @@ static u32 alu_neg(u32 op1, u32 op2, u32 *cpsr)
 
 static u32 alu_mul(u32 op1, u32 op2, u32 *cpsr)
 {
-    return 0;
+    return op1 * op2;
 }
 
 static const char *bin16_str(u16 data)
