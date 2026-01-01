@@ -451,9 +451,11 @@ static uint thumb_hi_operation(Cpu *this, u16 opcode)
             puts("ADD HI");
             reg(rd) = alu_add(reg(rd), reg(rs), &dummy);
         break;
-        case 1:
+        case 1: {
             puts("CMP HI");
-            alu_sub(reg(rd), reg(rs), &this->cpsr);
+            u32 result = alu_sub(reg(rd), reg(rs), &this->cpsr);
+            cpu_update_zn(result, &this->cpsr);
+        }
         break;
         case 2:
             puts("MOV HI");
