@@ -324,9 +324,12 @@ static uint thumb_cond_branch(Cpu *this, u16 opcode)
 static uint thumb_branch(Cpu *this, u16 opcode)
 {
     puts("B");
-    u32 offset = opcode & 0xFF;
+    u32 offset = bits(opcode, 0, 11);
+    if (bit(offset, 10)) {
+        offset |= ~(u32)0  << 11;
+    }
 
-    reg(15) += ((i8)offset) * 2;
+    reg(15) += offset << 1;
     this->pc_changed = 1;
 
     return 1;
