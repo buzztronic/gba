@@ -509,6 +509,7 @@ static uint thumb_load_address(Cpu *this, u16 opcode)
 
 static uint thumb_add_stack_pointer(Cpu *this, u16 opcode)
 {
+    puts("ADD PC");
     u32 offset = bits(opcode, 0, 7) << 2;
 
     if (bit(opcode, 7)) {
@@ -617,16 +618,19 @@ static uint thumb_ldst_signed(Cpu *this, u16 opcode)
     switch (op) {
         // STRH
         case 0:
+            puts("STRH");
             bus_write16(this->bus, addr & ~0x1, reg(rd));
         break;
 
         // LDSB
         case 1:
+            puts("LDSB");
             reg(rd) = (i8)bus_read(this->bus, addr);
         break;
 
         // LDRH
         case 2:
+            puts("LDRH");
             if (addr % 2) {
                 reg(rd) = ror32(bus_read16(this->bus, addr-1), 8);
             } else {
@@ -636,6 +640,7 @@ static uint thumb_ldst_signed(Cpu *this, u16 opcode)
 
         // LDSH
         case 3:
+            puts("LDSH");
             if (addr % 2) {
                 reg(rd) = (i8)bus_read(this->bus, addr);
             } else {
@@ -707,6 +712,7 @@ static uint thumb_ldst_halfword(Cpu *this, u16 opcode)
 
     // Load
     if (flag_l) {
+        puts("LDRH");
         if (addr % 2) {
             reg(rd) = ror32(bus_read16(this->bus, addr-1), 8);
         } else {
@@ -716,6 +722,7 @@ static uint thumb_ldst_halfword(Cpu *this, u16 opcode)
 
     // Store
     if (!flag_l) {
+        puts("STRH");
         bus_write16(this->bus, addr & ~0x1, reg(rd));
     }
 
@@ -732,6 +739,7 @@ static uint thumb_ldst_sp_relative(Cpu *this, u16 opcode)
 
     // Load
     if (flag_l) {
+        puts("LDR SP");
         if (addr & 0x3) {
             // read at a word aligned address
             reg(rd) = bus_read32(this->bus, addr & ~0x3);
@@ -745,6 +753,7 @@ static uint thumb_ldst_sp_relative(Cpu *this, u16 opcode)
 
     // Store
     if (!flag_l) {
+        puts("STR SP");
         bus_write32(this->bus, addr & ~3, reg(rd));
     }
 
@@ -826,11 +835,12 @@ static uint thumb_ldst_multiple(Cpu *this, u16 opcode)
     // strange stuff happen
     if (nreg == 0) {
         if (flag_l) {
+            puts("LDM Empty");
             reg(15) = bus_read32(this->bus, reg(rb) & ~3);
             this->pc_changed = 1;
         } else {
+            puts("STM Empty");
             bus_write32(this->bus, reg(rb) & ~3, reg(15)+2);
-            puts("bad stuff");
         }
         reg(rb) += 0x40;
 
@@ -839,6 +849,11 @@ static uint thumb_ldst_multiple(Cpu *this, u16 opcode)
 
     u32 addr = reg(rb);
     u32 base = addr + nreg * 4;
+
+    if (flag_l)
+        puts("LDM");
+    else
+        puts("STM");
 
     uint cycles = 1;
     for (uint i = 0; i < 8; i++) {
