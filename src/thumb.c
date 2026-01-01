@@ -28,6 +28,7 @@ static uint thumb_ldst_immediate(Cpu *this, u16 opcode);
 static uint thumb_ldst_halfword(Cpu *this, u16 opcode);
 static uint thumb_ldst_sp_relative(Cpu *this, u16 opcode);
 static uint thumb_push_pop_registers(Cpu *this, u16 opcode);
+static uint thumb_ldst_multiple(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -231,6 +232,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 12, 4) == 12) {
             // Multiple load/store
+            this->decode_thumb[idx] = thumb_ldst_multiple;
             continue;
         }
 
@@ -806,6 +808,62 @@ static uint thumb_push_pop_registers(Cpu *this, u16 opcode)
     }
 
     reg(13) = sp;
+
+    return 1;
+}
+
+static uint thumb_ldst_multiple(Cpu *this, u16 opcode)
+{
+    u8 rb = bits(opcode, 8, 3);
+    u8 flag_l = bit(opcode, 11);
+
+    // number of registers to be transfered
+    u32 nreg = 0;
+    for (u32 i = 0; i < 8; ++i) {
+        nreg += bit(opcode, i);
+    }
+
+    // strange stuff happen
+    if (nreg == 0) {
+        if (flag_l) {
+            reg(15) = bus_read32(this->bus, reg(rb) & ~3);
+            this->pc_changed = 1;
+        } else {
+            bus_write32(this->bus, reg(rb) & ~3, reg(15)+2);
+            puts("bad stuff");
+        }
+        reg(rb) += 0x40;
+
+        return 1;
+    }
+
+    u32 addr = reg(rb);
+    u32 base = addr + nreg * 4;
+
+    uint cycles = 1;
+    for (uint i = 0; i < 8; i++) {
+        if (is_clear(opcode, i))
+            continue;
+
+        cycles++;
+
+        // Load
+        if (flag_l) {
+            reg(i) = bus_read32(this->bus, addr & ~3);
+        }
+
+        // Store
+        if (!flag_l) {
+            bus_write32(this->bus, addr & ~3, reg(i));
+        }
+
+        // write-back is done at the second cycle
+        if (cycles == 2) {
+            reg(rb) = base;
+        }
+
+        addr += 4;
+    }
 
     return 1;
 }
