@@ -21,6 +21,7 @@ static uint thumb_hi_operation(Cpu *this, u16 opcode);
 static uint thumb_load_address(Cpu *this, u16 opcode);
 static uint thumb_add_stack_pointer(Cpu *this, u16 opcode);
 static uint thumb_branch_link(Cpu *this, u16 opcode);
+static uint thumb_load_pc_relative(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -172,6 +173,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 11, 5) == 9) {
             // PC relative load
+            this->decode_thumb[idx] = thumb_load_pc_relative;
             continue;
         }
 
@@ -522,6 +524,17 @@ static uint thumb_branch_link(Cpu *this, u16 opcode)
         reg(14) = (pc - 2) | 1;
         this->pc_changed = 1;
     }
+
+    return 1;
+}
+
+static uint thumb_load_pc_relative(Cpu *this, u16 opcode)
+{
+    puts("LDR PC");
+    u8 rd = bits(opcode, 8, 3);
+    u32 offset = bits(opcode, 0, 8) << 2;
+
+    reg(rd) = bus_read32(this->bus, (reg(15) & ~2) + offset);
 
     return 1;
 }
