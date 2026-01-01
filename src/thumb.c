@@ -19,6 +19,7 @@ static uint thumb_alu(Cpu *this, u16 opcode);
 static uint thumb_branch_exchange(Cpu *this, u16 opcode);
 static uint thumb_hi_operation(Cpu *this, u16 opcode);
 static uint thumb_load_address(Cpu *this, u16 opcode);
+static uint thumb_add_stack_pointer(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -206,6 +207,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
         if (bits(opcode, 12, 4) == 11) {
             if (bit(opcode, 10) == 0) {
                 // Add offset to stack pointer
+                this->decode_thumb[idx] = thumb_add_stack_pointer;
             } else {
                 // Push/pop registers
             }
@@ -482,6 +484,19 @@ static uint thumb_load_address(Cpu *this, u16 opcode)
         reg(rd) = reg(13) + imm;
     } else {
         reg(rd) = (reg(15) & ~2) + imm;
+    }
+
+    return 1;
+}
+
+static uint thumb_add_stack_pointer(Cpu *this, u16 opcode)
+{
+    u32 offset = bits(opcode, 0, 7) << 2;
+
+    if (bit(opcode, 7)) {
+        reg(13) -= offset;
+    } else {
+        reg(13) += offset;
     }
 
     return 1;
