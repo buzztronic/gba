@@ -481,7 +481,7 @@ static uint thumb_load_address(Cpu *this, u16 opcode)
     if (bit(opcode, 11)) {
         reg(rd) = reg(13) + imm;
     } else {
-        reg(rd) = (reg(15) & ~1) + imm;
+        reg(rd) = (reg(15) & ~2) + imm;
     }
 
     return 1;
