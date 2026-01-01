@@ -26,6 +26,7 @@ static uint thumb_ldst_register_offset(Cpu *this, u16 opcode);
 static uint thumb_ldst_signed(Cpu *this, u16 opcode);
 static uint thumb_ldst_immediate(Cpu *this, u16 opcode);
 static uint thumb_ldst_halfword(Cpu *this, u16 opcode);
+static uint thumb_ldst_sp_relative(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -206,6 +207,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 12, 4) == 9) {
             // SP-relative load/store
+            this->decode_thumb[idx] = thumb_ldst_sp_relative;
             continue;
         }
 
@@ -711,6 +713,35 @@ static uint thumb_ldst_halfword(Cpu *this, u16 opcode)
     // Store
     if (!flag_l) {
         bus_write16(this->bus, addr & ~0x1, reg(rd));
+    }
+
+    return 1;
+}
+
+static uint thumb_ldst_sp_relative(Cpu *this, u16 opcode)
+{
+    u8 rd = bits(opcode, 8, 3);
+    u8 flag_l = bit(opcode, 11);
+
+    u32 addr = bits(opcode, 0, 8) << 2;
+    addr += reg(13);
+
+    // Load
+    if (flag_l) {
+        if (addr & 0x3) {
+            // read at a word aligned address
+            reg(rd) = bus_read32(this->bus, addr & ~0x3);
+
+            // rotate such that lower byte of rd matches the addressed byte
+            reg(rd) = ror32(reg(rd), 8 * (addr % 4));
+        } else {
+            reg(rd) = bus_read32(this->bus, addr);
+        }
+    }
+
+    // Store
+    if (!flag_l) {
+        bus_write32(this->bus, addr & ~3, reg(rd));
     }
 
     return 1;
