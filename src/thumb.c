@@ -105,6 +105,7 @@ static u16 cpu_fetch_thumb(Cpu *this)
 {
     u16 opcode;
 
+    reg(15) &= ~1;
     if (this->pc_changed) {
         cpu_reset_pipeline_thumb(this);
         this->pc_changed = 0;
