@@ -22,6 +22,7 @@ static uint thumb_load_address(Cpu *this, u16 opcode);
 static uint thumb_add_stack_pointer(Cpu *this, u16 opcode);
 static uint thumb_branch_link(Cpu *this, u16 opcode);
 static uint thumb_load_pc_relative(Cpu *this, u16 opcode);
+static uint thumb_ldst_register_offset(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -180,6 +181,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
         if (bits(opcode, 12, 4) == 5) {
             if (bit(opcode, 9) == 0) {
                 // Load/store with register offset
+                this->decode_thumb[idx] = thumb_ldst_register_offset;
             } else {
                 // Load/store sign-extended byte/halfword
             }
@@ -535,6 +537,58 @@ static uint thumb_load_pc_relative(Cpu *this, u16 opcode)
     u32 offset = bits(opcode, 0, 8) << 2;
 
     reg(rd) = bus_read32(this->bus, (reg(15) & ~2) + offset);
+
+    return 1;
+}
+
+static uint thumb_ldst_register_offset(Cpu *this, u16 opcode)
+{
+    u8 flag_l = bit(opcode, 11);
+    u8 flag_b = bit(opcode, 10);
+    u8 rd = bits(opcode, 0, 3);
+
+    u8 rb = bits(opcode, 3, 3);
+    u8 ro = bits(opcode, 6, 3);
+
+    u32 addr = reg(rb) + reg(ro);
+
+    // load
+    if (flag_l) {
+        // byte
+        if (flag_b) {
+            puts("LDRB");
+            reg(rd) = bus_read(this->bus, addr);
+        }
+
+        // word
+        if (!flag_b) {
+            puts("LDR");
+            if (addr & 0x3) {
+                // read at a word aligned address
+                reg(rd) = bus_read32(this->bus, addr & ~0x3);
+
+                // rotate such that lower byte of rd matches the addressed byte
+                reg(rd) = ror32(reg(rd), 8 * (addr % 4));
+            } else {
+                reg(rd) = bus_read32(this->bus, addr);
+            }
+        }
+    }
+
+    // store
+    if (!flag_l) {
+        // byte
+        if (flag_b) {
+            puts("STRB");
+            bus_write(this->bus, addr, reg(rd));
+        }
+
+        // word
+        if (!flag_b){
+            puts("STR");
+            bus_write32(this->bus, addr & ~0x3, reg(rd));
+        }
+    }
 
     return 1;
 }
