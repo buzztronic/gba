@@ -161,7 +161,6 @@ static void cpu_build_decode_table_thumb(Cpu *this)
 
         if (bits(opcode, 10, 6) == 0x10) {
             // ALU operation
-            printf("ALU: %s\n", bin8_str(opcode >> 8));
             this->decode_thumb[idx] = thumb_alu;
             continue;
         }
