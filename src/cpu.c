@@ -990,7 +990,7 @@ static void cpu_build_condition_table(Cpu *this)
             break;
             case 0x9:
                 // LS
-                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_C) && is_set(cpsr, PSR_BIT_Z);
+                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_C) || is_set(cpsr, PSR_BIT_Z);
             break;
             case 0xA:
                 // GE
