@@ -993,15 +993,15 @@ static u32 alu_ror(u32 op1, u32 op2, u32 *cpsr)
     u32 result = op1;
     u32 carry = bit(*cpsr, PSR_BIT_C);
     u8 byte = bits(op2, 0, 8);
-    u8 nibble = bits(op2, 0, 4);
+    u8 low = bits(op2, 0, 5);
 
     if (byte == 0) {
         // unaffected
-    } else if (nibble == 0) {
+    } else if (low == 0) {
         carry = bit(op1, 31);
     } else {
-        carry = bit(op1, nibble - 1);
-        result = ror32(op1, nibble);
+        carry = bit(op1, low - 1);
+        result = ror32(op1, low);
     }
 
     if (carry)
@@ -1010,7 +1010,6 @@ static u32 alu_ror(u32 op1, u32 op2, u32 *cpsr)
         clear_bit(*cpsr, PSR_BIT_C);
 
     return result;
-    return 0;
 }
 
 static u32 alu_neg(u32 op1, u32 op2, u32 *cpsr)
