@@ -23,6 +23,7 @@ static uint cpu_execute_branch_exchange(Cpu *this, u32 opcode);
 static uint cpu_execute_data_swap(Cpu *this, u32 opcode);
 static uint cpu_execute_multiply(Cpu *this, u32 opcode);
 static uint cpu_execute_multiply_long(Cpu *this, u32 opcode);
+static uint cpu_software_interrupt(Cpu *this, u32 opcode);
 static void cpu_build_decode_table(Cpu *this);
 static void cpu_build_condition_table(Cpu *this);
 
@@ -855,6 +856,24 @@ static uint cpu_execute_multiply_long(Cpu *this, u32 opcode)
     return 1;
 }
 
+static uint cpu_software_interrupt(Cpu *this, u32 opcode)
+{
+    this->reg_svc[1] = (reg(15) - 4) & ~3;
+    this->spsr[CPU_MODE_SVC] = this->cpsr;
+
+    this->cpsr &= 0xFFFFFFF0;
+    this->cpsr |= CPU_MODE_SVC;
+    clear_bit(this->cpsr, PSR_BIT_T);
+    set_bit(this->cpsr, PSR_BIT_I);
+
+    cpu_bank_registers(this);
+
+    reg(15) = 0x00000008;
+    this->pc_changed = 1;
+
+    return 1;
+}
+
 static void cpu_build_decode_table(Cpu *this)
 {
     // TODO Clean up this mess
@@ -863,6 +882,10 @@ static void cpu_build_decode_table(Cpu *this)
         // bits[0:3] become bits[4:7]
         // bits[4:12] become bits[20:27]
         u32 opcode = (bits(idx, 4, 8) << 20) | (bits(idx, 0, 4) << 4);
+        if (bits(opcode, 24, 4) == 0xF) {
+            this->decode[idx] = cpu_software_interrupt;
+            continue;
+        }
         if (bits(opcode, 22, 6) == 0 && bits(opcode, 4, 4) == 9) {
             this->decode[idx] = cpu_execute_multiply;
             continue;
