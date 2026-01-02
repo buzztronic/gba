@@ -10,7 +10,8 @@
 static uint cpu_step_arm(Cpu *this);
 static u32 cpu_fetch_arm(Cpu *this);
 static void cpu_reset_pipeline(Cpu *this);
-static void cpu_bank_registers(Cpu *this);
+
+void cpu_bank_registers(Cpu *this);
 
 static uint cpu_execute_not_implemented(Cpu *this, u32 opcode);
 static uint cpu_execute_branch(Cpu *this, u32 opcode);
@@ -184,7 +185,7 @@ void cpu_reset_pipeline(Cpu *this)
     reg(15) += 8;
 }
 
-static void cpu_bank_registers(Cpu *this)
+void cpu_bank_registers(Cpu *this)
 {
     switch (bits(this->cpsr, 0, 4)) {
         case CPU_MODE_SYS:

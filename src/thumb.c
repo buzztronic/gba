@@ -897,6 +897,9 @@ static uint thumb_software_interrupt(Cpu *this, u16 opcode)
     clear_bit(this->cpsr, PSR_BIT_T);
     set_bit(this->cpsr, PSR_BIT_I);
 
+    void cpu_bank_registers(Cpu *);
+    cpu_bank_registers(this);
+
     reg(15) = 0x00000008;
     this->pc_changed = 1;
 
