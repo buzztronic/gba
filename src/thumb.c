@@ -29,6 +29,7 @@ static uint thumb_ldst_halfword(Cpu *this, u16 opcode);
 static uint thumb_ldst_sp_relative(Cpu *this, u16 opcode);
 static uint thumb_push_pop_registers(Cpu *this, u16 opcode);
 static uint thumb_ldst_multiple(Cpu *this, u16 opcode);
+static uint thumb_software_interrupt(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
 static const char *bin16_str(u16 data);
@@ -241,6 +242,7 @@ static void cpu_build_decode_table_thumb(Cpu *this)
                 this->decode_thumb[idx] = thumb_cond_branch;
             } else {
                 // Software Interrupt
+                this->decode_thumb[idx] = thumb_software_interrupt;
             }
             continue;
         }
@@ -881,6 +883,22 @@ static uint thumb_ldst_multiple(Cpu *this, u16 opcode)
 
         addr += 4;
     }
+
+    return 1;
+}
+
+static uint thumb_software_interrupt(Cpu *this, u16 opcode)
+{
+    this->reg_svc[1] = reg(15) - 2;
+    this->spsr[CPU_MODE_SVC] = this->cpsr;
+
+    this->cpsr &= 0xFFFFFFF0;
+    this->cpsr |= CPU_MODE_SVC;
+    clear_bit(this->cpsr, PSR_BIT_T);
+    set_bit(this->cpsr, PSR_BIT_I);
+
+    reg(15) = 0x00000008;
+    this->pc_changed = 1;
 
     return 1;
 }
