@@ -583,7 +583,7 @@ static uint cpu_execute_single_transfer(Cpu *this, u32 opcode)
     // compute the offset
     if (flag_i) {
         u32 dummy;
-        u32 rm = opcode & 0xF;
+        u32 rm = reg(opcode & 0xF);
         offset = compute_shift(this, opcode, rm, &dummy);
     }
 
