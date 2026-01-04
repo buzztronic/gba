@@ -1,11 +1,26 @@
-#include <stdlib.h>
+#include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "bus.h"
 
+static u32 bios_read(void *, u32 addr, u8 width);
+static u32 rom_read(void *, u32 addr, u8 width);
+static u32 ewram_read(void *, u32 addr, u8 width);
+static u32 iwram_read(void *, u32 addr, u8 width);
+static u32 sram_read(void *, u32 addr, u8 width);
+static u32 invalid_read(void *, u32 addr, u8 width);
+static u32 io_read(void *, u32 addr, u8 width);
+
+static void ewram_write(void *, u32 addr, u8 width, u32 data);
+static void iwram_write(void *, u32 addr, u8 width, u32 data);
+static void sram_write(void *, u32 addr, u8 width, u32 data);
+static void invalid_write(void *, u32 addr, u8 width, u32 data);
+static void io_write(void *, u32 addr, u8 width, u32 data);
+
 static void bus_load_bios(Bus *this, const char *bios);
 static void bus_load_rom(Bus *this, const char *rom);
-static u8 *bus_get_ptr(Bus *this, u32 addr);
 
 Bus *bus_init(const char *rom, const char *bios)
 {
@@ -14,136 +29,72 @@ Bus *bus_init(const char *rom, const char *bios)
     bus_load_rom(bus, rom);
     bus_load_bios(bus, bios);
 
-    bus->map[0].start = BIOS_ADDR;
-    bus->map[0].end = BIOS_ADDR + BIOS_SIZE;
-    bus->map[0].mem = bus->bios;
+    bus->dev[0] = (BusDev){bus, bios_read, invalid_write};
+    bus->dev[1] = (BusDev){bus, bios_read, invalid_write};
+    bus->dev[2] = (BusDev){bus, ewram_read, ewram_write};
+    bus->dev[3] = (BusDev){bus, iwram_read, iwram_write};
+    bus->dev[4] = (BusDev){bus, io_read, io_write};
 
-    bus->map[1].start = BIOS_ADDR;
-    bus->map[1].end = BIOS_ADDR + BIOS_SIZE;
-    bus->map[1].mem = bus->bios;
+    // initially invalid. ppu will attach it self later
+    bus->dev[5] = (BusDev){bus, invalid_read, invalid_write};
+    bus->dev[6] = (BusDev){bus, invalid_read, invalid_write};
+    bus->dev[7] = (BusDev){bus, invalid_read, invalid_write};
 
-    bus->map[2].start = EWRAM_ADDR;
-    bus->map[2].end = EWRAM_ADDR + EWRAM_SIZE;
-    bus->map[2].mem = bus->ewram;
+    // ROM
+    for (uint i = 8; i <= 0xD; i++) {
+        bus->dev[i] = (BusDev){bus, rom_read, invalid_write};
+    }
 
-    bus->map[3].start = IWRAM_ADDR;
-    bus->map[3].end = IWRAM_ADDR + IWRAM_SIZE;
-    bus->map[3].mem = bus->iwram;
+    bus->dev[0xE] = (BusDev){bus, sram_read, sram_write};
+    bus->dev[0xF] = (BusDev){bus, sram_read, sram_write};
 
-    bus->map[4].start = IO_ADDR;
-    bus->map[4].end = IO_ADDR + IO_SIZE;
-    bus->map[4].mem = bus->io;
+    // invalid
+    for (uint i = 0x10; i <= 0xFF; i++) {
+        bus->dev[i] = (BusDev){bus, invalid_read, invalid_write};
+    }
 
-    bus->map[5].start = PLT_ADDR;
-    bus->map[5].end = PLT_ADDR + PLT_SIZE;
-    bus->map[5].mem = bus->plt;
-
-    bus->map[6].start = VRAM_ADDR;
-    bus->map[6].end = VRAM_ADDR + VRAM_SIZE;
-    bus->map[6].mem = bus->vram;
-
-    bus->map[7].start = OAM_ADDR;
-    bus->map[7].end = OAM_ADDR + OAM_SIZE;
-    bus->map[7].mem = bus->oam;
-
-    bus->map[8].start = ROM_ADDR1;
-    bus->map[8].end = ROM_ADDR1 + ROM_SIZE;
-    bus->map[8].mem = bus->rom;
-    bus->map[9].start = ROM_ADDR1;
-    bus->map[9].end = ROM_ADDR1 + ROM_SIZE;
-    bus->map[9].mem = bus->rom;
-
-    bus->map[0xA].start = ROM_ADDR2;
-    bus->map[0xA].end = ROM_ADDR2 + ROM_SIZE;
-    bus->map[0xA].mem = bus->rom;
-    bus->map[0xB].start = ROM_ADDR2;
-    bus->map[0xB].end = ROM_ADDR2 + ROM_SIZE;
-    bus->map[0xB].mem = bus->rom;
-
-    bus->map[0xC].start = ROM_ADDR3;
-    bus->map[0xC].end = ROM_ADDR3 + ROM_SIZE;
-    bus->map[0xC].mem = bus->rom;
-    bus->map[0xD].start = ROM_ADDR3;
-    bus->map[0xD].end = ROM_ADDR3 + ROM_SIZE;
-    bus->map[0xD].mem = bus->rom;
-
-    bus->map[0xE].start = SRAM_ADDR;
-    bus->map[0xE].end = SRAM_ADDR + SRAM_SIZE;
-    bus->map[0xE].mem = bus->sram;
-
-    bus->map[0xF].start = 0;
-    bus->map[0xF].end = 0;
-    bus->map[0xF].mem = NULL;
+    // I/O
+    for (uint i = 0; i <= 0xFF; i++) {
+        bus->io_dev[i] = (BusDev){bus, invalid_read, invalid_write};
+    }
 
     return bus;
 }
 
-static u8 *bus_get_ptr(Bus *this, u32 addr)
-{
-    u32 idx = (addr >> 24) & 0xF;
-    MemMap *region = &this->map[idx];
-    if (addr > region->end)
-        return NULL;
-
-    return &region->mem[addr - region->start];
-}
-
 u8 bus_read(Bus *this, u32 addr)
 {
-    u8 *ptr = bus_get_ptr(this, addr);
-    if (ptr != NULL)
-        return *ptr;
-
-    return 0xFF;
+    BusDev *dev = &this->dev[addr >> 24];
+    return dev->read(dev->this, addr, WIDTH_8);
 }
 
 void bus_write(Bus *this, u32 addr, u8 data)
 {
-    u8 *ptr = bus_get_ptr(this, addr);
-    if (ptr == NULL)
-        return;
-
-    *ptr = data;
+    BusDev *dev = &this->dev[addr >> 24];
+    dev->write(dev->this, addr, WIDTH_8, data);
 }
 
 u16 bus_read16(Bus *this, u32 addr)
 {
-    u8 *ptr = bus_get_ptr(this, addr);
-    if (ptr == NULL)
-        return 0xFFFF;
-
-    return ptr[0] | (ptr[1] << 8);
+    BusDev *dev = &this->dev[addr >> 24];
+    return dev->read(dev->this, addr, WIDTH_16);
 }
 
 void bus_write16(Bus *this, u32 addr, u16 data)
 {
-    u8 *ptr = bus_get_ptr(this, addr);
-    if (ptr == NULL)
-        return;
-
-    ptr[0] = data & 0xFF;
-    ptr[1] = data >> 8;
+    BusDev *dev = &this->dev[addr >> 24];
+    dev->write(dev->this, addr, WIDTH_16, data);
 }
 
 u32 bus_read32(Bus *this, u32 addr)
 {
-    u8 *ptr = bus_get_ptr(this, addr);
-    if (ptr == NULL)
-        return 0xFFFFFFFF;
-
-    return ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24);
+    BusDev *dev = &this->dev[addr >> 24];
+    return dev->read(dev->this, addr, WIDTH_32);
 }
 
 void bus_write32(Bus *this, u32 addr, u32 data)
 {
-    u8 *ptr = bus_get_ptr(this, addr);
-    if (ptr == NULL)
-        return;
-
-    ptr[0] = data;
-    ptr[1] = data >> 8;
-    ptr[2] = data >> 16;
-    ptr[3] = data >> 24;
+    BusDev *dev = &this->dev[addr >> 24];
+    dev->write(dev->this, addr, WIDTH_32, data);
 }
 
 static void bus_load_bios(Bus *this, const char *bios)
@@ -172,7 +123,150 @@ static void bus_load_rom(Bus *this, const char *rom)
     fclose(f);
 }
 
-u8 *bus_getvram(Bus *this)
+static u32 bios_read(void *dev, u32 addr, u8 width)
 {
-    return this->vram;
+    Bus *this = dev;
+    return read_memory(this->bios+addr, width);
+}
+
+static u32 rom_read(void *dev, u32 addr, u8 width)
+{
+    Bus *this = dev;
+    addr &= ROM_SIZE - 1;
+    return read_memory(this->rom+addr, width);
+}
+
+static u32 ewram_read(void *dev, u32 addr, u8 width)
+{
+    Bus *this = dev;
+    addr &= 0x40000 - 1;
+    return read_memory(this->ewram+addr, width);
+}
+
+static u32 iwram_read(void *dev, u32 addr, u8 width)
+{
+    Bus *this = dev;
+    addr &= 0x8000 - 1;
+    return read_memory(this->iwram+addr, width);
+}
+
+static u32 sram_read(void *dev, u32 addr, u8 width)
+{
+    Bus *this = dev;
+    addr -= SRAM_ADDR;
+    return read_memory(this->sram+addr, width);
+}
+
+static u32 invalid_read(void *dev, u32 addr, u8 width)
+{
+    return 0xFFFFFFFF;
+}
+
+static u32 io_read(void *dev, u32 addr, u8 width)
+{
+    Bus *this = dev;
+    addr -= 0x04000000;
+
+    BusDev *io_dev = &this->io_dev[(addr >> 4) & 0xFF];
+    return io_dev->read(io_dev->this, addr, width);
+}
+
+static void ewram_write(void *dev, u32 addr, u8 width, u32 data)
+{
+    Bus *this = dev;
+    addr &= 0x40000 - 1;
+    write_memory(this->ewram+addr, width, data);
+}
+
+static void iwram_write(void *dev, u32 addr, u8 width, u32 data)
+{
+    Bus *this = dev;
+    addr &= 0x8000 - 1;
+    write_memory(this->iwram+addr, width, data);
+}
+
+static void sram_write(void *dev, u32 addr, u8 width, u32 data)
+{
+    Bus *this = dev;
+    addr -= SRAM_ADDR;
+    write_memory(this->sram+addr, width, data);
+}
+
+static void invalid_write(void *dev, u32 addr, u8 width, u32 data)
+{
+}
+
+static void io_write(void *dev, u32 addr, u8 width, u32 data)
+{
+    Bus *this = dev;
+    addr -= 0x04000000;
+
+    BusDev *io_dev = &this->io_dev[(addr >> 4) & 0xFF];
+    io_dev->write(io_dev->this, addr, width, data);
+}
+
+void bus_attach_plt(Bus *this, const BusDev *dev)
+{
+    memcpy(&this->dev[5], dev, sizeof(BusDev));
+}
+
+void bus_attach_vram(Bus *this, const BusDev *dev)
+{
+    memcpy(&this->dev[6], dev, sizeof(BusDev));
+}
+
+void bus_attach_oam(Bus *this, const BusDev *dev)
+{
+    memcpy(&this->dev[7], dev, sizeof(BusDev));
+}
+
+void bus_attach_lcd(Bus *this, const BusDev *dev)
+{
+    for (uint i = 0; i <= 5; i++)
+        memcpy(&this->io_dev[i], dev, sizeof(BusDev));
+}
+
+void bus_attach_keypad(Bus *this, const BusDev *dev)
+{
+    memcpy(&this->io_dev[0x13], dev, sizeof(BusDev));
+}
+
+u32 read_memory(u8 *mem, u8 width)
+{
+    switch (width) {
+        case WIDTH_8:
+            return mem[0];
+        break;
+        case WIDTH_16:
+            return mem[0] | (mem[1] << 8);
+        break;
+        case WIDTH_32:
+            return mem[0] | (mem[1] << 8) | (mem[2] << 16) | (mem[3] << 24);
+        break;
+        default:
+            assert(0);
+        break;
+    }
+}
+
+void write_memory(u8 *mem, u8 width, u32 data)
+{
+    switch (width) {
+        case WIDTH_8:
+            mem[0] = data;
+        break;
+        case WIDTH_16:
+            mem[0] = data;
+            mem[1] = data >> 8;
+        break;
+        case WIDTH_32:
+            mem[0] = data;
+            mem[1] = data >> 8;
+            mem[2] = data >> 16;
+            mem[3] = data >> 24;
+        break;
+        default:
+            assert(0);
+        break;
+    }
 }

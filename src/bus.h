@@ -24,27 +24,24 @@
 #define ROM_ADDR3  0x0C000000
 #define SRAM_ADDR  0x0E000000
 
-typedef struct MemMap {
-    u32 start;
-    u32 end;
-    u8 *mem;
-} MemMap;
+enum {WIDTH_8, WIDTH_16, WIDTH_32};
+
+typedef struct BusDev {
+    void *this;
+    u32 (*read)(void *dev, u32 addr, u8 width);
+    void (*write)(void *dev, u32 addr, u8 width, u32 data);
+} BusDev;
 
 typedef struct Bus {
     u8 bios[BIOS_SIZE];
     u8 ewram[EWRAM_SIZE];
     u8 iwram[IWRAM_SIZE];
     u8 rom[ROM_SIZE];
-    u8 plt[PLT_SIZE];
-    u8 vram[VRAM_SIZE];
-    u8 oam[OAM_SIZE];
     u8 sram[SRAM_SIZE];
     u8 io[IO_SIZE];
 
-    MemMap map[0x10];
-
-    // NOTE: for the moment everything is stored this strucut
-    // including I/O registers but that will probably change later
+    BusDev dev[0x100];
+    BusDev io_dev[0x100];
 } Bus;
 
 Bus *bus_init(const char *rom, const char *bios);
@@ -58,4 +55,11 @@ void bus_write16(Bus *this, u32 addr, u16 data);
 u32 bus_read32(Bus *this, u32 addr);
 void bus_write32(Bus *this, u32 addr, u32 data);
 
-u8 *bus_getvram(Bus *this);
+void bus_attach_plt(Bus *this, const BusDev *dev);
+void bus_attach_vram(Bus *this, const BusDev *dev);
+void bus_attach_oam(Bus *this, const BusDev *dev);
+void bus_attach_lcd(Bus *this, const BusDev *dev);
+void bus_attach_keypad(Bus *this, const BusDev *dev);
+
+u32 read_memory(u8 *mem, u8 width);
+void write_memory(u8 *mem, u8 width, u32 data);
