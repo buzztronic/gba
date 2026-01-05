@@ -6,18 +6,16 @@
 #include "cpu.h"
 #include "bus.h"
 #include "ppu.h"
+#include "keypad.h"
 
 enum State {STATE_RUNNING, STATE_PAUSED, STATE_QUIT};
 
-u32 update_input(u32 state)
+#define KEY_PAUSE   SDLK_SPACE
+#define KEY_CLOSE   SDLK_q
+
+u32 handle_inputs(Keypad *keyp, u32 state)
 {
     SDL_Event ev;
-    static u32 saved_time = 0;
-
-    if (SDL_GetTicks64() - saved_time < 16) {
-        return state;
-    }
-    saved_time = SDL_GetTicks64();
 
     while (SDL_PollEvent(&ev)) {
         if (ev.type == SDL_QUIT) {
@@ -27,15 +25,19 @@ u32 update_input(u32 state)
 
         if (ev.type == SDL_KEYDOWN) {
             switch (ev.key.keysym.sym) {
-                case SDLK_q:
+                case KEY_CLOSE:
                     return STATE_QUIT;
-                case SDLK_p:
+                case KEY_PAUSE:
                     if (state == STATE_RUNNING)
                         return STATE_PAUSED;
                     else
                         return STATE_RUNNING;
                 break;
             }
+        }
+
+        if (ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) {
+            update_keypad(keyp, &ev);
         }
     }
     return state;
@@ -50,18 +52,20 @@ int main(int argc, char **argv)
 
     SDL_Init(SDL_INIT_EVERYTHING);
 
-    Bus *bus = bus_init(argv[1], argv[2]);
+    Bus *bus = bus_init(argv[2], argv[1]);
     Cpu *cpu = cpu_init(bus);
     Ppu *ppu = ppu_init(bus);
+    Keypad *keyp = keypad_init(bus);
 
     u32 state = STATE_RUNNING;
     u32 counter = 0;
     while (1) {
-        if (counter >= 10000) {
+        if (counter >= 1000) {
             counter = 0;
-            state = update_input(state);
+            state = handle_inputs(keyp, state);
         }
         if (state == STATE_PAUSED) {
+            counter += 1;
             continue;
         } else if (state == STATE_QUIT) {
             break;
