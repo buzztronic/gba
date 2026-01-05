@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -10,6 +11,7 @@
 static uint cpu_step_arm(Cpu *this);
 static u32 cpu_fetch_arm(Cpu *this);
 static void cpu_reset_pipeline(Cpu *this);
+static void cpu_handle_interrupts(Cpu *this);
 
 void cpu_bank_registers(Cpu *this);
 
@@ -112,6 +114,10 @@ Cpu *cpu_init(Bus *bus)
         bus_write(bus, i, 0);
     }
 
+    bus_write16(bus, 0x4000208, 0);
+    bus_write16(bus, 0x4000200, 0);
+    bus_write16(bus, 0x4000202, 0xFFFF);
+
     cpu->bus = bus;
     cpu->pc_changed = 1;
 
@@ -126,6 +132,8 @@ Cpu *cpu_init(Bus *bus)
 
 uint cpu_step(Cpu *this)
 {
+    cpu_handle_interrupts(this);
+
     if (is_clear(this->cpsr, PSR_BIT_T)) {
         return cpu_step_arm(this);
     } else {
@@ -183,6 +191,49 @@ void cpu_reset_pipeline(Cpu *this)
     this->execute_opcode = bus_read32(this->bus, reg(15) & ~3);
     this->decode_opcode = bus_read32(this->bus, (reg(15) & ~3) + 4);
     reg(15) += 8;
+}
+
+static void cpu_handle_interrupts(Cpu *this)
+{
+    u8 irq_master = bus_read(this->bus, 0x4000208);
+
+    if (is_set(this->cpsr, PSR_BIT_I) || is_clear(irq_master, 0))
+        return;
+
+    u16 irq_flag = bus_read16(this->bus, 0x4000202);
+    u16 irq_enable = bus_read16(this->bus, 0x4000200);
+
+    if (irq_flag & irq_enable) {
+        puts("IRQ");
+        printf("irq_flag:    %04X\n", irq_flag);
+        printf("irq_enable:  %04X\n", irq_enable);
+
+        this->reg_irq[1] = reg(15) + 4;
+        if (!this->pc_changed) {
+            if (is_clear(this->cpsr, PSR_BIT_T)) {
+                this->reg_irq[1] -= 4;
+                this->reg_irq[1] &= ~3;
+            } else {
+                this->reg_irq[1] -= 2;
+                this->reg_irq[1] &= ~1;
+            }
+        }
+
+        this->spsr[CPU_MODE_IRQ] = this->cpsr;
+
+        this->cpsr &= ~0xF;
+        this->cpsr |= CPU_MODE_IRQ;
+        cpu_bank_registers(this);
+
+        // switch to ARM
+        clear_bit(this->cpsr, PSR_BIT_T);
+
+        // disable IRQ
+        set_bit(this->cpsr, PSR_BIT_I);
+
+        reg(15) = 0x00000018;
+        this->pc_changed = 1;
+    }
 }
 
 void cpu_bank_registers(Cpu *this)
@@ -677,28 +728,24 @@ static uint cpu_execute_psr_transfer(Cpu *this, u32 opcode)
             op = ror32(imm, rot_imm * 2);
         }
 
-        u32 byte_mask = 0;
         u32 mask = 0;
 
         if (flag_c)
-            byte_mask |= 0x000000FF;
+            mask |= 0x000000FF;
         if (flag_x)
-            byte_mask |= 0x0000FF00;
+            mask |= 0x0000FF00;
         if (flag_s)
-            byte_mask |= 0x00FF0000;
+            mask |= 0x00FF0000;
         if (flag_f)
-            byte_mask |= 0xFF000000;
+            mask |= 0xFF000000;
 
         if (flag_psr) {
-            mask = byte_mask & 0xF000003F;
             this->spsr[this->cpsr & PSR_MASK_MODE] &= ~mask;
             this->spsr[this->cpsr & PSR_MASK_MODE] |= op & mask;
         } else {
             if ((this->cpsr & PSR_MASK_MODE) == 0x0) {
                 // in User Mode only condition flags can be changed
-                mask = byte_mask & 0xF0000000;
-            } else {
-                mask = byte_mask & 0xF000001F;
+                mask &= 0xFF000000;
             }
             this->cpsr &= ~mask;
             this->cpsr |= op & mask;

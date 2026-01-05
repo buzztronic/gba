@@ -16,6 +16,7 @@ typedef int64_t i64;
 
 #ifdef DISABLE_PRINT
     #define printf(...)
+    #define fprintf(...)
     #define puts(foo)
 #endif
 
@@ -74,3 +75,7 @@ inline u32 bits(u32 val, u32 p, u32 n)
 #define BIT_30 (1 << 30)
 #define BIT_31 (1 << 31)
 #define BIT_32 (1 << 32)
+
+#define IRQ_VBLANK BIT_0
+#define IRQ_HBLANK BIT_1
+#define IRQ_VMATCH BIT_2

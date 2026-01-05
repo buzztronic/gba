@@ -40,6 +40,8 @@ typedef struct Bus {
     u8 sram[SRAM_SIZE];
     u8 io[IO_SIZE];
 
+    u8 sysctl[0x10];
+
     BusDev dev[0x100];
     BusDev io_dev[0x100];
 } Bus;
@@ -61,5 +63,8 @@ void bus_attach_oam(Bus *this, const BusDev *dev);
 void bus_attach_lcd(Bus *this, const BusDev *dev);
 void bus_attach_keypad(Bus *this, const BusDev *dev);
 
+void bus_send_irq(Bus *this, u16 irq);
+
 u32 read_memory(u8 *mem, u8 width);
 void write_memory(u8 *mem, u8 width, u32 data);
+void write_register(u8 *mem, u8 width, u32 data);

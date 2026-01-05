@@ -56,6 +56,7 @@ Ppu *ppu_init(Bus *bus)
     ppu->sdl_ren = SDL_CreateRenderer(ppu->sdl_win, -1, SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
     //ppu->sdl_ren = SDL_CreateRenderer(ppu->sdl_win, -1, SDL_RENDERER_ACCELERATED);
     ppu->sdl_frame = SDL_CreateRGBSurfaceWithFormat(0, FRAME_W, FRAME_H, 15, SDL_PIXELFORMAT_BGR555);
+    memset(ppu->sdl_frame->pixels, 0x55, FRAME_W * FRAME_H * 2);
 
     return ppu;
 }
@@ -73,6 +74,10 @@ void ppu_update(Ppu *this, u32 cycles)
                 ppu_draw_scaneline(this);
                 this->state = PPU_STATE_HBLANK;
 
+                if (dispstat & BIT_4) {
+                    bus_send_irq(this->bus, IRQ_HBLANK);
+                }
+
                 dispstat &= ~3;
                 dispstat |= BIT_1;
             }
@@ -87,6 +92,10 @@ void ppu_update(Ppu *this, u32 cycles)
 
                     dispstat &= ~3;
                     dispstat |= 1;
+
+                    if (dispstat & BIT_3) {
+                        bus_send_irq(this->bus, IRQ_VBLANK);
+                    }
 
                     SDL_Texture *texture = SDL_CreateTextureFromSurface(this->sdl_ren, this->sdl_frame);
                     SDL_RenderClear(this->sdl_ren);
@@ -124,7 +133,7 @@ void ppu_free(Ppu *this)
 
 static void ppu_draw_scaneline(Ppu *this)
 {
-    u8 mode = bus_read(this->bus, 0x4000000) & 7;
+    u8 mode = this->reg[REG_DISPCNT] & 7;
     switch (mode) {
         case 3: {
             u32 offset = this->reg[REG_VCOUNT] * FRAME_W * 2;
@@ -139,6 +148,10 @@ static void ppu_draw_scaneline(Ppu *this)
                 pixels[x*2+0] = this->plt[line[x] * 2];
                 pixels[x*2+1] = this->plt[line[x] * 2 + 1];
             }
+        }
+        break;
+        case 5: {
+            exit(0);
         }
         break;
     }
@@ -158,9 +171,9 @@ static void ppu_set_ly(Ppu *this, u8 ly)
         // set V-Counter flag
         dispstat |= BIT_2;
 
-        // set bit 2 of IF
+        // send irq
         if (bit(dispstat, 5)) {
-            // TODO
+            bus_send_irq(this->bus, IRQ_VMATCH);
         }
     } else {
         // clear V-Counter flag
@@ -188,7 +201,12 @@ static u32 oam_read(void *dev, u32 addr, u8 width)
 static u32 vram_read(void *dev, u32 addr, u8 width)
 {
     Ppu *this = dev;
-    addr -= VRAM_ADDR;
+    //addr -= VRAM_ADDR;
+    if (bits(this->reg[REG_DISPCNT], 0, 3) < 3) {
+        addr &= 0x17FFF;
+    } else {
+        addr &= 0x1FFFF;
+    }
     return read_memory(this->vram+addr, width);
 }
 
@@ -201,6 +219,10 @@ static u32 lcd_read(void *dev, u32 addr, u8 width)
 
 static void plt_write(void *dev, u32 addr, u8 width, u32 data)
 {
+    if (width == WIDTH_8) {
+        width = WIDTH_16;
+        data |= data << 8;
+    }
     Ppu *this = dev;
     addr &= PLT_SIZE - 1;
     write_memory(this->plt+addr, width, data);
@@ -208,6 +230,8 @@ static void plt_write(void *dev, u32 addr, u8 width, u32 data)
 
 static void oam_write(void *dev, u32 addr, u8 width, u32 data)
 {
+    if (width == WIDTH_8)
+        return;
     Ppu *this = dev;
     addr &= OAM_SIZE - 1;
     write_memory(this->oam+addr, width, data);
@@ -215,14 +239,44 @@ static void oam_write(void *dev, u32 addr, u8 width, u32 data)
 
 static void vram_write(void *dev, u32 addr, u8 width, u32 data)
 {
+    if (width == WIDTH_8) {
+        width = WIDTH_16;
+        data |= data << 8;
+    }
     Ppu *this = dev;
-    addr -= VRAM_ADDR;
+    if (bits(this->reg[REG_DISPCNT], 0, 3) < 3) {
+        addr &= 0x17FFF;
+    } else {
+        addr &= 0x1FFFF;
+    }
     write_memory(this->vram+addr, width, data);
+}
+
+static void write_lcd_register(Ppu *this, u32 addr, u8 data)
+{
+    if (addr == 4) {
+        this->reg[addr] &= 7;
+        this->reg[addr] |= data;
+    } else {
+        this->reg[addr] = data;
+    }
 }
 
 static void lcd_write(void *dev, u32 addr, u8 width, u32 data)
 {
     Ppu *this = dev;
     addr &= 0xFF;
-    write_memory(this->reg+addr, width, data);
+    switch (width) {
+        case WIDTH_32:
+            write_lcd_register(this, addr+3, data >> 24);
+            write_lcd_register(this, addr+2, data >> 16);
+        case WIDTH_16:
+            write_lcd_register(this, addr+1, data >> 8);
+        case WIDTH_8:
+            write_lcd_register(this, addr, data);
+        break;
+        default:
+            assert(0);
+        break;
+    }
 }
