@@ -206,12 +206,9 @@ static u32 oam_read(void *dev, u32 addr, u8 width)
 static u32 vram_read(void *dev, u32 addr, u8 width)
 {
     Ppu *this = dev;
-    //addr -= VRAM_ADDR;
-    if (bits(this->reg[REG_DISPCNT], 0, 3) < 3) {
-        addr &= 0x17FFF;
-    } else {
-        addr &= 0x1FFFF;
-    }
+    addr &= 0x1FFFF;
+    if (addr >= 0x18000)
+        addr -= 0x8000;
     return read_memory(this->vram+addr, width);
 }
 
@@ -244,12 +241,21 @@ static void oam_write(void *dev, u32 addr, u8 width, u32 data)
 
 static void vram_write(void *dev, u32 addr, u8 width, u32 data)
 {
+    Ppu *this = dev;
+    addr &= 0x1FFFF;
+
+    u8 mode = this->reg[REG_DISPCNT] & 7;
     if (width == WIDTH_8) {
+        if (mode < 3 && addr >= 0x10000)
+            return;
+        else if (mode >= 3 && addr >= 0x14000)
+            return;
         width = WIDTH_16;
         data |= data << 8;
     }
-    Ppu *this = dev;
-    addr &= 0x1FFFF;
+
+    if (addr >= 0x18000)
+        addr -= 0x8000;
     write_memory(this->vram+addr, width, data);
 }
 
