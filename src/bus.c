@@ -160,7 +160,9 @@ static u32 iwram_read(void *dev, u32 addr, u8 width)
 static u32 sram_read(void *dev, u32 addr, u8 width)
 {
     Bus *this = dev;
-    addr -= SRAM_ADDR;
+    width = WIDTH_8;
+    addr &= 0xFFFF;
+    // TODO
     return read_memory(this->sram+addr, width);
 }
 
