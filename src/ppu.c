@@ -114,9 +114,10 @@ void ppu_update(Ppu *this, u32 cycles)
                 this->cycles %= 1232;
                 ly++;
                 ppu_set_ly(this, ly);
-                if (ly == 160+68) {
-                    this->state = PPU_STATE_HDRAW;
+                if (ly == 227) {
                     dispstat &= ~3;
+                } else if (ly == 228) {
+                    this->state = PPU_STATE_HDRAW;
                 }
             }
         break;
