@@ -134,7 +134,9 @@ void ppu_free(Ppu *this)
 
 static void ppu_draw_scaneline(Ppu *this)
 {
-    u8 mode = this->reg[REG_DISPCNT] & 7;
+    u16 dispcnt = this->reg[REG_DISPCNT] | (this->reg[REG_DISPCNT+1] << 8);
+    u8 mode = bits(dispcnt, 0, 3);
+    u8 frame = bit(dispcnt, 4);
     switch (mode) {
         case 3: {
             u32 offset = this->reg[REG_VCOUNT] * FRAME_W * 2;
@@ -144,6 +146,8 @@ static void ppu_draw_scaneline(Ppu *this)
         break;
         case 4: {
             u8 *line = this->vram + this->reg[REG_VCOUNT] * FRAME_W;
+            if (frame)
+                line += 0xA000;
             u8 *pixels = (u8 *)this->sdl_frame->pixels + this->reg[REG_VCOUNT] * FRAME_W * 2;
             for (uint x = 0; x < FRAME_W; ++x) {
                 pixels[x*2+0] = this->plt[line[x] * 2];
@@ -245,11 +249,7 @@ static void vram_write(void *dev, u32 addr, u8 width, u32 data)
         data |= data << 8;
     }
     Ppu *this = dev;
-    if (bits(this->reg[REG_DISPCNT], 0, 3) < 3) {
-        addr &= 0x17FFF;
-    } else {
-        addr &= 0x1FFFF;
-    }
+    addr &= 0x1FFFF;
     write_memory(this->vram+addr, width, data);
 }
 
