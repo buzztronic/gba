@@ -5,6 +5,7 @@
 
 #include "cpu.h"
 #include "bus.h"
+#include "dma.h"
 #include "ppu.h"
 #include "keypad.h"
 
@@ -55,6 +56,7 @@ int main(int argc, char **argv)
     Bus *bus = bus_init(argv[2], argv[1]);
     Cpu *cpu = cpu_init(bus);
     Ppu *ppu = ppu_init(bus);
+    Dma *dma = dma_init(bus);
     Keypad *keyp = keypad_init(bus);
 
     u32 state = STATE_RUNNING;
@@ -70,6 +72,8 @@ int main(int argc, char **argv)
         } else if (state == STATE_QUIT) {
             break;
         }
+
+        dma_update(dma);
 
         // proper timing will be implemented later
         int n = cpu_step(cpu);

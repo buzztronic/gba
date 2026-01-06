@@ -12,7 +12,9 @@ typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
 
-//#define DISABLE_PRINT
+enum PpuState {PPU_STATE_HDRAW, PPU_STATE_HBLANK, PPU_STATE_VBLANK};
+
+#define DISABLE_PRINT
 
 #ifdef DISABLE_PRINT
     #define printf(...)

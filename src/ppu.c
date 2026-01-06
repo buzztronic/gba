@@ -25,7 +25,6 @@ static void oam_write(void *, u32 addr, u8 width, u32 data);
 static void vram_write(void *, u32 addr, u8 width, u32 data);
 static void lcd_write(void *, u32 addr, u8 width, u32 data);
 
-enum PpuState {PPU_STATE_HDRAW, PPU_STATE_HBLANK, PPU_STATE_VBLANK};
 
 Ppu *ppu_init(Bus *bus)
 {
@@ -46,6 +45,8 @@ Ppu *ppu_init(Bus *bus)
 
     ppu->cycles = 0;
     ppu->state = PPU_STATE_HDRAW;
+
+    bus_notify_ppu_state(bus, ppu->state);
 
     ppu->sdl_win = SDL_CreateWindow(WIN_TITLE,
         WIN_X,
@@ -73,6 +74,7 @@ void ppu_update(Ppu *this, u32 cycles)
             if (this->cycles >= 960) {
                 ppu_draw_scaneline(this);
                 this->state = PPU_STATE_HBLANK;
+                bus_notify_ppu_state(this->bus, this->state);
 
                 if (dispstat & BIT_4) {
                     bus_send_irq(this->bus, IRQ_HBLANK);
@@ -89,6 +91,7 @@ void ppu_update(Ppu *this, u32 cycles)
                 ppu_set_ly(this, ly);
                 if (ly == 160) {
                     this->state = PPU_STATE_VBLANK;
+                    bus_notify_ppu_state(this->bus, this->state);
 
                     dispstat &= ~3;
                     dispstat |= 1;
@@ -104,6 +107,7 @@ void ppu_update(Ppu *this, u32 cycles)
                     SDL_DestroyTexture(texture);
                 } else {
                     this->state = PPU_STATE_HDRAW;
+                    bus_notify_ppu_state(this->bus, this->state);
 
                     dispstat &= ~3;
                 }
@@ -118,6 +122,7 @@ void ppu_update(Ppu *this, u32 cycles)
                     dispstat &= ~3;
                 } else if (ly == 228) {
                     this->state = PPU_STATE_HDRAW;
+                    bus_notify_ppu_state(this->bus, this->state);
                 }
             }
         break;

@@ -46,6 +46,8 @@ typedef struct Bus {
 
     BusDev dev[0x100];
     BusDev io_dev[0x100];
+
+    u8 ppu_state;
 } Bus;
 
 Bus *bus_init(const char *rom, const char *bios);
@@ -63,7 +65,11 @@ void bus_attach_plt(Bus *this, const BusDev *dev);
 void bus_attach_vram(Bus *this, const BusDev *dev);
 void bus_attach_oam(Bus *this, const BusDev *dev);
 void bus_attach_lcd(Bus *this, const BusDev *dev);
+void bus_attach_dma(Bus *this, const BusDev *dev);
 void bus_attach_keypad(Bus *this, const BusDev *dev);
+
+void bus_notify_ppu_state(Bus *this, u8 state);
+u8 bus_get_ppu_state(Bus *this);
 
 void bus_send_irq(Bus *this, u16 irq);
 

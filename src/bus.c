@@ -285,6 +285,22 @@ void bus_attach_keypad(Bus *this, const BusDev *dev)
     memcpy(&this->io_dev[0x13], dev, sizeof(BusDev));
 }
 
+void bus_attach_dma(Bus *this, const BusDev *dev)
+{
+    for (uint i = 0xB; i <= 0xF; i++)
+        memcpy(&this->io_dev[i], dev, sizeof(BusDev));
+}
+
+void bus_notify_ppu_state(Bus *this, u8 state)
+{
+    this->ppu_state = state;
+}
+
+u8 bus_get_ppu_state(Bus *this)
+{
+    return this->ppu_state;
+}
+
 void bus_send_irq(Bus *this, u16 irq)
 {
     this->sysctl[2] |= irq;
