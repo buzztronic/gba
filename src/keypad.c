@@ -75,6 +75,7 @@ static void write_keypad_register(Keypad *this, u32 addr, u8 data)
 static u32 keypad_read(void *dev, u32 addr, u8 width)
 {
     Keypad *this = dev;
+    addr &= align_mask[width];
     addr &= 0xF;
     return read_memory(this->reg+addr, width);
 }
@@ -82,6 +83,7 @@ static u32 keypad_read(void *dev, u32 addr, u8 width)
 static void keypad_write(void *dev, u32 addr, u8 width, u32 data)
 {
     Keypad *this = dev;
+    addr &= align_mask[width];
     addr &= 0xF;
     switch (width) {
         case WIDTH_32:

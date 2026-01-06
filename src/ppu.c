@@ -192,6 +192,7 @@ static void ppu_set_ly(Ppu *this, u8 ly)
 static u32 plt_read(void *dev, u32 addr, u8 width)
 {
     Ppu *this = dev;
+    addr &= align_mask[width];
     addr &= PLT_SIZE - 1;
     return read_memory(this->plt+addr, width);
 }
@@ -199,6 +200,7 @@ static u32 plt_read(void *dev, u32 addr, u8 width)
 static u32 oam_read(void *dev, u32 addr, u8 width)
 {
     Ppu *this = dev;
+    addr &= align_mask[width];
     addr &= OAM_SIZE - 1;
     return read_memory(this->oam+addr, width);
 }
@@ -206,6 +208,7 @@ static u32 oam_read(void *dev, u32 addr, u8 width)
 static u32 vram_read(void *dev, u32 addr, u8 width)
 {
     Ppu *this = dev;
+    addr &= align_mask[width];
     addr &= 0x1FFFF;
     if (addr >= 0x18000)
         addr -= 0x8000;
@@ -215,6 +218,7 @@ static u32 vram_read(void *dev, u32 addr, u8 width)
 static u32 lcd_read(void *dev, u32 addr, u8 width)
 {
     Ppu *this = dev;
+    addr &= align_mask[width];
     addr &= 0xFF;
     return read_memory(this->reg+addr, width);
 }
@@ -225,6 +229,7 @@ static void plt_write(void *dev, u32 addr, u8 width, u32 data)
         width = WIDTH_16;
         data |= data << 8;
     }
+    addr &= align_mask[width];
     Ppu *this = dev;
     addr &= PLT_SIZE - 1;
     write_memory(this->plt+addr, width, data);
@@ -235,6 +240,7 @@ static void oam_write(void *dev, u32 addr, u8 width, u32 data)
     if (width == WIDTH_8)
         return;
     Ppu *this = dev;
+    addr &= align_mask[width];
     addr &= OAM_SIZE - 1;
     write_memory(this->oam+addr, width, data);
 }
@@ -242,6 +248,7 @@ static void oam_write(void *dev, u32 addr, u8 width, u32 data)
 static void vram_write(void *dev, u32 addr, u8 width, u32 data)
 {
     Ppu *this = dev;
+    addr &= align_mask[width];
     addr &= 0x1FFFF;
 
     u8 mode = this->reg[REG_DISPCNT] & 7;
@@ -272,6 +279,7 @@ static void write_lcd_register(Ppu *this, u32 addr, u8 data)
 static void lcd_write(void *dev, u32 addr, u8 width, u32 data)
 {
     Ppu *this = dev;
+    addr &= align_mask[width];
     addr &= 0xFF;
     switch (width) {
         case WIDTH_32:

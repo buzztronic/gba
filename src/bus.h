@@ -26,6 +26,8 @@
 
 enum {WIDTH_8, WIDTH_16, WIDTH_32};
 
+extern u32 align_mask[3];
+
 typedef struct BusDev {
     void *this;
     u32 (*read)(void *dev, u32 addr, u8 width);

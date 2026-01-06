@@ -133,12 +133,14 @@ static void bus_load_rom(Bus *this, const char *rom)
 static u32 bios_read(void *dev, u32 addr, u8 width)
 {
     Bus *this = dev;
+    addr &= align_mask[width];
     return read_memory(this->bios+addr, width);
 }
 
 static u32 rom_read(void *dev, u32 addr, u8 width)
 {
     Bus *this = dev;
+    addr &= align_mask[width];
     addr &= ROM_SIZE - 1;
     return read_memory(this->rom+addr, width);
 }
@@ -146,6 +148,7 @@ static u32 rom_read(void *dev, u32 addr, u8 width)
 static u32 ewram_read(void *dev, u32 addr, u8 width)
 {
     Bus *this = dev;
+    addr &= align_mask[width];
     addr &= 0x40000 - 1;
     return read_memory(this->ewram+addr, width);
 }
@@ -153,6 +156,7 @@ static u32 ewram_read(void *dev, u32 addr, u8 width)
 static u32 iwram_read(void *dev, u32 addr, u8 width)
 {
     Bus *this = dev;
+    addr &= align_mask[width];
     addr &= 0x8000 - 1;
     return read_memory(this->iwram+addr, width);
 }
@@ -174,6 +178,7 @@ static u32 invalid_read(void *dev, u32 addr, u8 width)
 static u32 io_read(void *dev, u32 addr, u8 width)
 {
     Bus *this = dev;
+    addr &= align_mask[width];
     addr -= 0x04000000;
 
     BusDev *io_dev = &this->io_dev[(addr >> 4) & 0xFF];
@@ -183,6 +188,7 @@ static u32 io_read(void *dev, u32 addr, u8 width)
 static u32 sysctl_read(void *dev, u32 addr, u8 width)
 {
     Bus *this = dev;
+    addr &= align_mask[width];
     addr &= 0xF;
     return read_memory(this->sysctl+addr, width);
 }
@@ -190,6 +196,7 @@ static u32 sysctl_read(void *dev, u32 addr, u8 width)
 static void ewram_write(void *dev, u32 addr, u8 width, u32 data)
 {
     Bus *this = dev;
+    addr &= align_mask[width];
     addr &= 0x40000 - 1;
     write_memory(this->ewram+addr, width, data);
 }
@@ -197,6 +204,7 @@ static void ewram_write(void *dev, u32 addr, u8 width, u32 data)
 static void iwram_write(void *dev, u32 addr, u8 width, u32 data)
 {
     Bus *this = dev;
+    addr &= align_mask[width];
     addr &= 0x8000 - 1;
     write_memory(this->iwram+addr, width, data);
 }
@@ -215,6 +223,7 @@ static void invalid_write(void *dev, u32 addr, u8 width, u32 data)
 static void io_write(void *dev, u32 addr, u8 width, u32 data)
 {
     Bus *this = dev;
+    addr &= align_mask[width];
     addr -= 0x04000000;
 
     BusDev *io_dev = &this->io_dev[(addr >> 4) & 0xFF];
@@ -233,6 +242,7 @@ static void write_sysctl_register(Bus *this, u32 addr, u8 data)
 static void sysctl_write(void *dev, u32 addr, u8 width, u32 data)
 {
     Bus *this = dev;
+    addr &= align_mask[width];
     addr &= 0xF;
     switch (width) {
         case WIDTH_32:

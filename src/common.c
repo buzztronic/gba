@@ -1,5 +1,7 @@
 #include "common.h"
 
+const u32 align_mask[] = { ~0, ~1, ~3 };
+
 int bit(u32 val, u32 idx);
 u32 bits(u32 val, u32 p, u32 n);
 
