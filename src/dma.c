@@ -101,6 +101,11 @@ static void dma_start(Dma *this, uint c)
             src_addr -= width;
     }
 
+    // Reload
+    if (dst_cnt == 3) {
+        write_memory(this->reg + offset + 4, WIDTH_32, dst_addr);
+    }
+
     // repeat
     if (!bit(cnt, 9)) {
         this->reg[offset+11] &= ~BIT_7;
