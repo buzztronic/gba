@@ -4,8 +4,10 @@
 
 #include "dma.h"
 
-#define REG_DMA0_CNT 0xBA
-#define REG_DMA1_CNT 0xC6
+const u32 REG_DMAX_CNT_H[] = { 0xBA, 0xC6, 0xD2, 0xDE }; // Control
+const u32 REG_DMAX_CNT_L[] = { 0xB8, 0xC4, 0xD0, 0xDC }; // Word count
+const u32 REG_DMAX_SAD[] = { 0xB0, 0xBC, 0xC8, 0xD4 };
+const u32 REG_DMAX_DAD[] = { 0xB4, 0xC0, 0xCC, 0xD8 };
 
 static u32 dma_read(void *, u32 addr, u8 width);
 static void dma_write(void *, u32 addr, u8 width, u32 data);
@@ -20,6 +22,7 @@ Dma *dma_init(Bus *bus)
     memset(dma, 0, sizeof(Dma));
 
     dma->bus = bus;
+    dma->ppu_state = PPU_STATE_HDRAW;
 
     BusDev dma_dev = {dma, dma_read, dma_write};
     bus_attach_dma(bus, &dma_dev);
@@ -27,42 +30,55 @@ Dma *dma_init(Bus *bus)
     return dma;
 }
 
-void dma_update(Dma *dma)
+void dma_update(Dma *this)
 {
     for (uint i = 0; i < 4; i++) {
-        if (dma_should_start(dma, i)) {
-            dma_start(dma, i);
+        u8 cnt = this->reg[REG_DMAX_CNT_H[i]+1];
+        if (bit(this->saved_cnt_h[i], 7) == 0 && bit(cnt, 7) == 1) {
+            // Reload
+            this->sad[i] = read_memory(this->reg + REG_DMAX_SAD[i], WIDTH_32);
+            this->dad[i] = read_memory(this->reg + REG_DMAX_DAD[i], WIDTH_32);
+            this->cnt_l[i] = read_memory(this->reg + REG_DMAX_CNT_L[i], WIDTH_16);
+        }
+        this->saved_cnt_h[i] = cnt;
+    }
+
+    for (uint i = 0; i < 4; i++) {
+        if (dma_should_start(this, i)) {
+            dma_start(this, i);
             break;
         }
     }
+
+    this->ppu_state = bus_get_ppu_state(this->bus);
 }
 
 static int dma_should_start(Dma *this, uint c)
 {
-    u32 index = REG_DMA0_CNT + c * (REG_DMA1_CNT - REG_DMA0_CNT);
-    u16 dmacnt = this->reg[index] | (this->reg[index+1] << 8);
+    u16 cnt = read_memory(this->reg + REG_DMAX_CNT_H[c], WIDTH_16);
 
-    if (!bit(dmacnt, 15))
+    // DMA disabled
+    if (!bit(cnt, 15))
         return 0;
 
-    u8 timing = bits(dmacnt, 12, 2);
+    u8 timing = bits(cnt, 12, 2);
 
     switch (timing) {
         case 0:
             return 1;
-        break;
+            break;
         case 1:
-            return bus_get_ppu_state(this->bus) == PPU_STATE_VBLANK;
-        break;
+            return this->ppu_state != PPU_STATE_VBLANK &&
+                bus_get_ppu_state(this->bus) == PPU_STATE_VBLANK;
+            break;
         case 2:
-            return bus_get_ppu_state(this->bus) == PPU_STATE_HBLANK;
-        break;
+            return this->ppu_state != PPU_STATE_HBLANK &&
+                bus_get_ppu_state(this->bus) == PPU_STATE_HBLANK;
+            break;
         case 3:
             // TODO
-            if (c == 3)
-                return 1;
-            return 0;
-        break;
+            return c == 3;
+            break;
     }
 
     return 1;
@@ -70,47 +86,63 @@ static int dma_should_start(Dma *this, uint c)
 
 static void dma_start(Dma *this, uint c)
 {
-    u32 offset = 0xB0 + c * (REG_DMA1_CNT - REG_DMA0_CNT);
-
-    u32 src_addr = read_memory(this->reg + offset, WIDTH_32);
-    u32 dst_addr = read_memory(this->reg + offset + 4, WIDTH_32);
-    u16 count = read_memory(this->reg + offset + 8, WIDTH_16);
-    u16 cnt = read_memory(this->reg + offset + 10, WIDTH_16);
+    u16 cnt = read_memory(this->reg + REG_DMAX_CNT_H[c], WIDTH_16);
 
     u8 width = bit(cnt, 10) ? 4 : 2;
-    u8 src_cnt = bits(cnt, 5, 2);
-    u8 dst_cnt = bits(cnt, 7, 2);
+    u8 dst_cnt = bits(cnt, 5, 2);
+    u8 src_cnt = bits(cnt, 7, 2);
+    u8 timing = bits(cnt, 12, 2);
+
+    u32 sad = this->sad[c];
+    u32 dad = this->dad[c];
+    u32 count = this->cnt_l[c];
+
+    // Clear DMA Enable bit
+    if (!bit(cnt, 9) || timing == 0) {
+        this->reg[REG_DMAX_CNT_H[c]+1] &= ~BIT_7;
+    }
+
+    if (c == 3) {
+        count &= BIT_16 - 1;
+        if (count == 0) {
+            count = BIT_16;
+        }
+    } else {
+        count &= BIT_14 - 1;
+        if (count == 0) {
+            count = BIT_14;
+        }
+    }
 
     for (; count > 0; count--) {
         if (width == 2) {
-            u16 data = bus_read16(this->bus, src_addr);
-            bus_write16(this->bus, dst_addr, data);
+            u16 data = bus_read16(this->bus, sad);
+            bus_write16(this->bus, dad, data);
         } else {
-            u32 data = bus_read32(this->bus, src_addr);
-            bus_write32(this->bus, dst_addr, data);
+            u32 data = bus_read32(this->bus, sad);
+            bus_write32(this->bus, dad, data);
         }
 
         if (dst_cnt == 0 || dst_cnt == 3)
-            dst_addr += width;
-        if (dst_cnt == 1)
-            dst_addr -= width;
+            dad += width;
+        else if (dst_cnt == 1)
+            dad -= width;
 
         if (src_cnt == 0)
-            src_addr += width;
-        if (src_cnt == 1)
-            src_addr -= width;
+            sad += width;
+        else if (src_cnt == 1)
+            sad -= width;
     }
 
-    // Reload
-    if (dst_cnt == 3) {
-        write_memory(this->reg + offset + 4, WIDTH_32, dst_addr);
-    }
+    // write back SAD and DAD: only useful for repeated DMA
+    // the count stays the same
+    this->sad[c] = sad;
 
-    // repeat
-    if (!bit(cnt, 9)) {
-        this->reg[offset+11] &= ~BIT_7;
-    }
+    // don't change DAD if reload is enabled
+    if (dst_cnt != 3)
+        this->dad[c] = dad;
 
+    // IRQ
     if (bit(cnt, 14)) {
         bus_send_irq(this->bus, 1 << (c + 8));
     }
