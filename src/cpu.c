@@ -1076,36 +1076,22 @@ u32 alu_eor(u32 op1, u32 op2, u32 *cpsr)
 
 u32 alu_sub(u32 op1, u32 op2, u32 *cpsr)
 {
-    u32 result = op1 - op2;
-    u8 result_s = bit(result, 31);
-    u8 op1_s = bit(op1, 31);
-    u8 op2_s = bit(op2, 31);
-
-    if (!(op2 > op1)) {
-        set_bit(*cpsr, PSR_BIT_C);
-    } else {
-        clear_bit(*cpsr, PSR_BIT_C);
-    }
-
-    if (op1_s != op2_s && op1_s != result_s)
-        set_bit(*cpsr, PSR_BIT_V);
-    else
-        clear_bit(*cpsr, PSR_BIT_V);
-
-    return result;
+    set_bit(*cpsr, PSR_BIT_C);
+    return alu_adc(op1, ~op2, cpsr);
 }
 
 u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr)
 {
-    return alu_sub(op2, op1, cpsr);
+    set_bit(*cpsr, PSR_BIT_C);
+    return alu_adc(op2, ~op1, cpsr);
 }
 
 u32 alu_add(u32 op1, u32 op2, u32 *cpsr)
 {
-    u32 result = op1 + op2;
-    u8 result_s = !!(result & BIT_31);
-    u8 op1_s = !!(op1 & BIT_31);
-    u8 op2_s = !!(op2 & BIT_31);
+    const u32 result = op1 + op2;
+    const u8 result_s = bit(result, 31);
+    const u8 op1_s = bit(op1, 31);
+    const u8 op2_s = bit(op2, 31);
 
     if (op1_s == op2_s && result_s != op1_s)
         set_bit(*cpsr, PSR_BIT_V);
@@ -1122,48 +1108,47 @@ u32 alu_add(u32 op1, u32 op2, u32 *cpsr)
 
 u32 alu_adc(u32 op1, u32 op2, u32 *cpsr)
 {
-    u32 carry = bit(*cpsr, PSR_BIT_C);
+    const u32 carry = bit(*cpsr, PSR_BIT_C);
+
+    const u32 sum = alu_add(op1, op2, cpsr);
 
     if (carry == 0)
-        return alu_add(op1, op2, cpsr);
+        return sum;
 
-    u32 sum = op1 + op2;
-    if (sum == ~(1 << 31)) {
+    const u8 op1_s = bit(op1, 31);
+    const u8 op2_s = bit(op2, 31);
+    const u8 result_s = bit(op1+op2+1, 31);
+
+    if (op1_s == op2_s && result_s != op1_s)
         set_bit(*cpsr, PSR_BIT_V);
-    } else {
+    else
         clear_bit(*cpsr, PSR_BIT_V);
-    }
 
-    if (sum == ~0) {
+    if (sum == ~(u32)0) {
         set_bit(*cpsr, PSR_BIT_C);
-    } else {
-        clear_bit(*cpsr, PSR_BIT_C);
     }
 
-    return sum + carry;
+    return sum + 1;
 }
 
 u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr)
 {
+    return alu_adc(op1, ~op2, cpsr);
     u32 not_carry = !bit(*cpsr, PSR_BIT_C);
 
+    u32 diff = alu_sub(op1, op2, cpsr);
+
     if (not_carry == 0)
-        return alu_sub(op1, op2, cpsr);
+        return diff;
 
-    u32 diff = op1 - op2;
-    if (diff == (1 << 31)) {
+    if (bit(diff, 31) && !bit(diff-1, 31)) {
         set_bit(*cpsr, PSR_BIT_V);
-    } else {
-        clear_bit(*cpsr, PSR_BIT_V);
     }
-
-    if (!(op1 <= op2)) {
+    if (diff != 0) {
         set_bit(*cpsr, PSR_BIT_C);
-    } else {
-        clear_bit(*cpsr, PSR_BIT_C);
     }
 
-    return diff - not_carry;
+    return diff - 1;
 }
 
 u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr)
