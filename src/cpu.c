@@ -1182,7 +1182,7 @@ static u32 compute_shift(Cpu *this, u32 opcode, u32 rm, u32 *carry)
     u32 type = bits(opcode, 5, 2);
     u32 shift_imm = bits(opcode, 7, 5);
     u32 rs = bits(opcode, 8, 4);
-    u32 rs_val = bits(reg(rs), 0, 7);
+    u32 rs_val = bits(reg(rs), 0, 8);
     u32 bit_r = bit(opcode, 4);
     u32 op2 = 0;
 
@@ -1280,12 +1280,12 @@ static u32 compute_shift(Cpu *this, u32 opcode, u32 rm, u32 *carry)
         // Rotate right by register
         if (rs_val == 0) {
             op2 = rm;
-        } else if (bits(rs_val, 0, 4) == 0) {
+        } else if (bits(rs_val, 0, 5) == 0) {
             op2 = rm;
             *carry = bit(rm, 31);
         } else {
-            op2 = ror32(rm, bits(rs_val, 0, 4));
-            *carry = bit(rm, bits(rs_val, 0, 4) - 1);
+            op2 = ror32(rm, bits(rs_val, 0, 5));
+            *carry = bit(rm, bits(rs_val, 0, 5) - 1);
         }
     } else {
         assert(0);
