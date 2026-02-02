@@ -82,7 +82,7 @@ int main(int argc, char **argv)
         if (n == 0)
             break;
 
-        ppu_update(ppu, 4);
+        ppu_update(ppu, 2);
     }
 
     // do we really need to free memory now?
