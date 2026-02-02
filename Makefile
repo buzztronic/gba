@@ -1,4 +1,4 @@
-ARGS = ./roms/games/doom.gba ./roms/bios.bin
+BIOS = ./roms/bios.bin
 EXE  = gba
 
 SRC  = $(wildcard src/*.c)
@@ -6,9 +6,10 @@ OBJS = $(SRC:src/%.c=build/.src/%.o)
 DEPS = $(SRC:src/%.c=build/.src/%.d)
 
 CC   = gcc
-CFLAGS = \
+OFLAGS = -O3 -flto
+CFLAGS = $(OFLAGS) \
+		 -Wsign-compare\
 		 -g \
-		 -Og \
 		 -Wall \
 		 -std=c99 \
 		 -pedantic \
@@ -16,7 +17,7 @@ CFLAGS = \
 		 -Isrc \
 		 `pkg-config --cflags sdl2`
 
-LDFLAGS = \
+LDFLAGS = $(OFLAGS) \
 		  `pkg-config --libs sdl2`
 
 all: info $(EXE)
@@ -40,11 +41,11 @@ build/stamp:
 	touch $@
 
 run r: $(EXE)
-	@./$(EXE) $(ARGS)
+	@rom=$$(find roms/ -iname '*.gba' | fzf) && ./$(EXE) $(BIOS) "$$rom"
 
 gdb: $(EXE)
-	@echo GDB: $(EXE) $(ARGS)
-	@gdb --args ./$(EXE) $(ARGS)
+	@rom="$$(find roms/ -iname '*.gba' | fzf)" && \
+	gdb --args ./$(EXE) $(BIOS) "$$rom"
 
 .PHONY: clean gdb run r
 clean:
