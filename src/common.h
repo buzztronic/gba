@@ -22,6 +22,8 @@ enum PpuState {PPU_STATE_HDRAW, PPU_STATE_HBLANK, PPU_STATE_VBLANK};
     #define puts(foo)
 #endif
 
+#define min(n, m) ((n) < (m) ? (n) : (m))
+#define max(n, m) ((n) > (m) ? (n) : (m))
 #define len(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define is_clear(data, bit) (!((data) & (1 << (bit))))
 #define is_set(data, bit) ((data) & (1 << (bit)))

@@ -19,6 +19,10 @@ typedef struct Ppu {
 
     // LCD I/O Registers
     u8 reg[0x60];
+
+    u8 reload_bg_ref[2];
+    double x0[2];
+    double y0[2];
 } Ppu;
 
 Ppu *ppu_init(Bus *bus);
