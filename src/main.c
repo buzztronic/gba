@@ -47,7 +47,7 @@ u32 handle_inputs(Keypad *keyp, u32 state)
 int main(int argc, char **argv)
 {
     if (argc < 3) {
-        puts("usage: gba BIOS ROM");
+        eprintf("usage: gba BIOS ROM\n");
         return 1;
     }
 

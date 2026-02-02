@@ -18,9 +18,11 @@ enum PpuState {PPU_STATE_HDRAW, PPU_STATE_HBLANK, PPU_STATE_VBLANK};
 
 #ifdef DISABLE_PRINT
     #define printf(...)
-    #define fprintf(...)
+    // #define fprintf(...)
     #define puts(foo)
 #endif
+
+#define eprintf(...) fprintf(stderr, __VA_ARGS__)
 
 #define min(n, m) ((n) < (m) ? (n) : (m))
 #define max(n, m) ((n) > (m) ? (n) : (m))
