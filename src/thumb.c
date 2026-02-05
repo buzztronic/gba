@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <assert.h>
 
 #include "thumb.h"
@@ -28,8 +27,6 @@ static uint thumb_ldst_sp_relative(Cpu *this, u16 opcode);
 static uint thumb_push_pop_registers(Cpu *this, u16 opcode);
 static uint thumb_ldst_multiple(Cpu *this, u16 opcode);
 static uint thumb_software_interrupt(Cpu *this, u16 opcode);
-
-static const char *bin8_str(u8 data);
 
 // defined in cpu.c
 u32 alu_sub(u32 op1, u32 op2, u32 *cpsr);
@@ -73,31 +70,10 @@ static u32 (*alu_thumb[])(u32, u32, u32 *) = {
     alu_mvn,
 };
 
-static const char *const alu_mnemonic_thumb[] = {
-    "AND",
-    "EOR",
-    "LSL",
-    "LSR",
-    "ASR",
-    "ADC",
-    "SBC",
-    "ROR",
-    "TST",
-    "NEG",
-    "CMP",
-    "CMN",
-    "ORR",
-    "MUL",
-    "BIC",
-    "MVN"
-};
-
 uint thumb_step(Cpu *this)
 {
     u16 opcode = thumb_fetch(this);
     uint cycles = 0;
-
-    printf("%08X %04X %s ", (reg(15) & ~1) - 4, opcode, bin8_str(opcode >> 8));
 
     cycles = this->decode_thumb[opcode >> 8](this, opcode);
 
@@ -262,8 +238,7 @@ void thumb_build_decode_table(Cpu *this)
 
 static uint thumb_execute_not_implemented(Cpu *this, u16 opcode)
 {
-    puts("Not Implemented");
-    printf("R7: %d\n", reg(7));
+    eprintf("thumb: unimplemented opcode: %04X\n", opcode);
     return 0;
 }
 
@@ -277,21 +252,17 @@ static uint thumb_move_immediate(Cpu *this, u16 opcode)
     switch (op) {
         case 0:
             // MOV
-            puts("MOV");
         break;
         case 1:
             // CMP
-            puts("CMP");
             result = alu_sub(reg(rd), imm, &this->cpsr);
         break;
         case 2:
             // ADD
-            puts("ADD");
             result = alu_add(reg(rd), imm, &this->cpsr);
         break;
         case 3:
             // SUB
-            puts("SUB");
             result = alu_sub(reg(rd), imm, &this->cpsr);
         break;
     }
@@ -307,7 +278,6 @@ static uint thumb_move_immediate(Cpu *this, u16 opcode)
 
 static uint thumb_cond_branch(Cpu *this, u16 opcode)
 {
-    puts("B");
     u32 cond_idx = bits(opcode, 8, 4);
     cond_idx |= bits(this->cpsr, 28, 4) << 4;
     if (this->cond_pass[cond_idx]) {
@@ -322,7 +292,6 @@ static uint thumb_cond_branch(Cpu *this, u16 opcode)
 
 static uint thumb_branch(Cpu *this, u16 opcode)
 {
-    puts("B");
     u32 offset = bits(opcode, 0, 11);
     if (bit(offset, 10)) {
         offset |= ~(u32)0  << 11;
@@ -344,7 +313,6 @@ static uint thumb_move_shifted_register(Cpu *this, u16 opcode)
     u32 carry = this->cpsr & PSR_BIT_C;
     if (op == 0) {
         // LSL
-        puts("LSL");
         if (imm == 0) {
             reg(rd) = reg(rs);
         } else {
@@ -353,7 +321,6 @@ static uint thumb_move_shifted_register(Cpu *this, u16 opcode)
         }
     } else if (op == 1) {
         // LSR
-        puts("LSR");
         if (imm == 0) {
             carry = bit(reg(rs), 31);
             reg(rd) = 0;
@@ -363,7 +330,6 @@ static uint thumb_move_shifted_register(Cpu *this, u16 opcode)
         }
     } else if (op == 2) {
         // ASR
-        puts("ASR");
         if (imm == 0) {
             carry = bit(reg(rs), 31);
             reg(rd) = carry ? 0xFFFFFFFF : 0;
@@ -401,11 +367,9 @@ static uint thumb_add_sub(Cpu *this, u16 opcode)
 
     if (opcode & BIT_9) {
         // sub
-        puts("SUB");
         reg(rd) = alu_sub(reg(rs), op, &this->cpsr);
     } else {
         // add
-        puts("ADD");
         reg(rd) = alu_add(reg(rs), op, &this->cpsr);
     }
 
@@ -420,8 +384,6 @@ static uint thumb_alu(Cpu *this, u16 opcode)
     u32 rs = bits(opcode, 3, 3);
     u32 op = bits(opcode, 6, 4);
 
-    puts(alu_mnemonic_thumb[op]);
-
     u32 result = alu_thumb[op](reg(rd), reg(rs), &this->cpsr);
 
     cpu_update_zn(result, &this->cpsr);
@@ -435,8 +397,6 @@ static uint thumb_alu(Cpu *this, u16 opcode)
 
 static uint thumb_branch_exchange(Cpu *this, u16 opcode)
 {
-    puts("BX");
-
     u32 rs = bits(opcode, 3, 4);
 
     if (rs == 15) {
@@ -451,11 +411,9 @@ static uint thumb_branch_exchange(Cpu *this, u16 opcode)
     if (rs & 1) {
         // Switch to Thumb
         set_bit(this->cpsr, PSR_BIT_T);
-        puts("SWITCH TO THUMB from thumb :)");
     } else {
         // Switch to ARM
         clear_bit(this->cpsr, PSR_BIT_T);
-        puts("SWITCH TO ARM");
     }
 
     return 1;
@@ -470,17 +428,14 @@ static uint thumb_hi_operation(Cpu *this, u16 opcode)
     u32 dummy;
     switch (op) {
         case 0:
-            puts("ADD HI");
             reg(rd) = alu_add(reg(rd), reg(rs), &dummy);
         break;
         case 1: {
-            puts("CMP HI");
             u32 result = alu_sub(reg(rd), reg(rs), &this->cpsr);
             cpu_update_zn(result, &this->cpsr);
         }
         break;
         case 2:
-            puts("MOV HI");
             reg(rd) = reg(rs);
         break;
     }
@@ -497,8 +452,6 @@ static uint thumb_load_address(Cpu *this, u16 opcode)
     u32 imm = bits(opcode, 0, 8) << 2;
     u8 rd = bits(opcode, 8, 3);
 
-    puts("ADR");
-
     if (bit(opcode, 11)) {
         reg(rd) = reg(13) + imm;
     } else {
@@ -510,7 +463,6 @@ static uint thumb_load_address(Cpu *this, u16 opcode)
 
 static uint thumb_add_stack_pointer(Cpu *this, u16 opcode)
 {
-    puts("ADD PC");
     u32 offset = bits(opcode, 0, 7) << 2;
 
     if (bit(opcode, 7)) {
@@ -525,7 +477,6 @@ static uint thumb_add_stack_pointer(Cpu *this, u16 opcode)
 static uint thumb_branch_link(Cpu *this, u16 opcode)
 {
     if (bit(opcode, 11) == 0) {
-        puts("BLL");
         u32 offset = bits(opcode, 0, 11);
         if (bit(offset, 10)) {
             offset |= ~(u32)0  << 11;
@@ -533,7 +484,6 @@ static uint thumb_branch_link(Cpu *this, u16 opcode)
         offset <<= 12;
         reg(14) = reg(15) + offset;
     } else {
-        puts("BLH");
         u32 pc = reg(15);
 
         reg(15) = reg(14) + (bits(opcode, 0, 11) << 1);
@@ -546,7 +496,6 @@ static uint thumb_branch_link(Cpu *this, u16 opcode)
 
 static uint thumb_load_pc_relative(Cpu *this, u16 opcode)
 {
-    puts("LDR PC");
     u8 rd = bits(opcode, 8, 3);
     u32 offset = bits(opcode, 0, 8) << 2;
 
@@ -570,13 +519,11 @@ static uint thumb_ldst_register_offset(Cpu *this, u16 opcode)
     if (flag_l) {
         // byte
         if (flag_b) {
-            puts("LDRB");
             reg(rd) = bus_read(this->bus, addr);
         }
 
         // word
         if (!flag_b) {
-            puts("LDR");
             if (addr & 0x3) {
                 // read at a word aligned address
                 reg(rd) = bus_read32(this->bus, addr & ~0x3);
@@ -593,13 +540,11 @@ static uint thumb_ldst_register_offset(Cpu *this, u16 opcode)
     if (!flag_l) {
         // byte
         if (flag_b) {
-            puts("STRB");
             bus_write(this->bus, addr, reg(rd));
         }
 
         // word
         if (!flag_b){
-            puts("STR");
             bus_write32(this->bus, addr & ~0x3, reg(rd));
         }
     }
@@ -619,19 +564,16 @@ static uint thumb_ldst_signed(Cpu *this, u16 opcode)
     switch (op) {
         // STRH
         case 0:
-            puts("STRH");
             bus_write16(this->bus, addr & ~0x1, reg(rd));
         break;
 
         // LDSB
         case 1:
-            puts("LDSB");
             reg(rd) = (i8)bus_read(this->bus, addr);
         break;
 
         // LDRH
         case 2:
-            puts("LDRH");
             if (addr % 2) {
                 reg(rd) = ror32(bus_read16(this->bus, addr-1), 8);
             } else {
@@ -641,7 +583,6 @@ static uint thumb_ldst_signed(Cpu *this, u16 opcode)
 
         // LDSH
         case 3:
-            puts("LDSH");
             if (addr % 2) {
                 reg(rd) = (i8)bus_read(this->bus, addr);
             } else {
@@ -668,13 +609,11 @@ static uint thumb_ldst_immediate(Cpu *this, u16 opcode)
     switch (op) {
         // STR
         case 0:
-            puts("STR");
             bus_write32(this->bus, addr & ~3, reg(rd));
         break;
 
         // LDR
         case 1:
-            puts("LDR");
             if (addr & 0x3) {
                 // read at a word aligned address
                 reg(rd) = bus_read32(this->bus, addr & ~0x3);
@@ -688,13 +627,11 @@ static uint thumb_ldst_immediate(Cpu *this, u16 opcode)
 
         // STRB
         case 2:
-            puts("STRB");
             bus_write(this->bus, addr, reg(rd));
         break;
 
         // LDRB
         case 3:
-            puts("LDRB");
             reg(rd) = bus_read(this->bus, addr);
         break;
     }
@@ -713,7 +650,6 @@ static uint thumb_ldst_halfword(Cpu *this, u16 opcode)
 
     // Load
     if (flag_l) {
-        puts("LDRH");
         if (addr % 2) {
             reg(rd) = ror32(bus_read16(this->bus, addr-1), 8);
         } else {
@@ -723,7 +659,6 @@ static uint thumb_ldst_halfword(Cpu *this, u16 opcode)
 
     // Store
     if (!flag_l) {
-        puts("STRH");
         bus_write16(this->bus, addr & ~0x1, reg(rd));
     }
 
@@ -740,7 +675,6 @@ static uint thumb_ldst_sp_relative(Cpu *this, u16 opcode)
 
     // Load
     if (flag_l) {
-        puts("LDR SP");
         if (addr & 0x3) {
             // read at a word aligned address
             reg(rd) = bus_read32(this->bus, addr & ~0x3);
@@ -754,7 +688,6 @@ static uint thumb_ldst_sp_relative(Cpu *this, u16 opcode)
 
     // Store
     if (!flag_l) {
-        puts("STR SP");
         bus_write32(this->bus, addr & ~3, reg(rd));
     }
 
@@ -776,13 +709,11 @@ static uint thumb_push_pop_registers(Cpu *this, u16 opcode)
 
     // POP
     if (flag_l) {
-        puts("POP");
         sp += nreg * 4;
     }
 
     // PUSH
     if (!flag_l) {
-        puts("PUSH");
         sp -= nreg * 4;
         addr = sp;
     }
@@ -836,11 +767,9 @@ static uint thumb_ldst_multiple(Cpu *this, u16 opcode)
     // strange stuff happen
     if (nreg == 0) {
         if (flag_l) {
-            puts("LDM Empty");
             reg(15) = bus_read32(this->bus, reg(rb) & ~3);
             this->pc_changed = 1;
         } else {
-            puts("STM Empty");
             bus_write32(this->bus, reg(rb) & ~3, reg(15)+2);
         }
         reg(rb) += 0x40;
@@ -850,11 +779,6 @@ static uint thumb_ldst_multiple(Cpu *this, u16 opcode)
 
     u32 addr = reg(rb);
     u32 base = addr + nreg * 4;
-
-    if (flag_l)
-        puts("LDM");
-    else
-        puts("STM");
 
     uint cycles = 1;
     for (uint i = 0; i < 8; i++) {
@@ -1008,16 +932,4 @@ static u32 alu_neg(u32 op1, u32 op2, u32 *cpsr)
 static u32 alu_mul(u32 op1, u32 op2, u32 *cpsr)
 {
     return op1 * op2;
-}
-
-static const char *bin8_str(u8 data)
-{
-    static char buff[] = "XXXX_XXXX";
-    for (int i = 8; i >= 0; i--) {
-        if (buff[i] == '_')
-            continue;
-        buff[i] = "01"[data & 1];
-        data >>= 1;
-    }
-    return buff;
 }

@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <assert.h>
 
 #include "cpu.h"
@@ -44,34 +43,11 @@ static u32 (*alu[16])(u32 op1, u32 op2, u32 *cpsr) = {
     alu_mvn
 };
 
-static char *const alu_mnemonic[16] = {
-    "AND",
-    "EOR",
-    "SUB",
-    "RSB",
-    "ADD",
-    "ADC",
-    "SBC",
-    "RSC",
-
-    "TST",
-    "TEQ",
-    "CMP",
-    "CMN",
-
-    "ORR",
-    "MOV",
-    "BIC",
-    "MVN"
-};
-
 // functions
 uint arm_step(Cpu *this)
 {
     u32 opcode = arm_fetch(this);
     uint cycles = 0;
-
-    printf("%08X %08X ", reg(15) - 8, opcode);
 
     // compute the index for the condition lookup table
     u8 cond_idx = bits(opcode, 28, 4);
@@ -82,7 +58,6 @@ uint arm_step(Cpu *this)
         u32 index = (bits(opcode, 20, 8) << 4) | bits(opcode, 4, 4);
         cycles = this->decode[index](this, opcode);
     } else {
-        puts("COND Failed");
         cycles = 1;
     }
 
@@ -116,7 +91,7 @@ void arm_flush_pipeline(Cpu *this)
 
 uint arm_execute_not_implemented(Cpu *this, u32 opcode)
 {
-    puts("Not Implemented");
+    eprintf("arm: unimplemented opcode: %08X\n", opcode);
     return 0;
 }
 
@@ -124,11 +99,7 @@ uint arm_execute_branch(Cpu *this, u32 opcode)
 {
     if (bit(opcode, 24)) {
         // branch with link
-        printf("BL ");
-
         reg(14) = reg(15) - 4;
-    } else {
-        printf("B ");
     }
 
     u32 offset = bits(opcode, 0, 24);
@@ -140,8 +111,6 @@ uint arm_execute_branch(Cpu *this, u32 opcode)
 
     reg(15) += (i32)offset;
     this->pc_changed = 1;
-
-    printf("#%X (%d)\n", 8 + offset, 8 + offset);
 
     return 1;
 }
@@ -157,7 +126,6 @@ static uint arm_execute_alu(Cpu *this, u32 opcode)
     u32 op2 = 0;
     u32 result = 0;
 
-    puts(alu_mnemonic[alu_opcode]);
 
     u32 shift_carry = bit(this->cpsr, PSR_BIT_C);
     if (bit_i) {
@@ -238,7 +206,6 @@ static uint arm_execute_signed_transfer(Cpu *this, u32 opcode)
 {
     // page 34
     // review this implemention it is probably bugged
-    puts("LD/ST Signed");
 
     u32 bit_p = bit(opcode, 24);
     u32 bit_u = bit(opcode, 23);
@@ -336,7 +303,6 @@ static uint arm_execute_signed_transfer(Cpu *this, u32 opcode)
 
 static uint arm_execute_block_transfer(Cpu *this, u32 opcode)
 {
-    puts("LD/ST Multiple");
     u32 flag_p = bit(opcode, 24);
     u32 flag_u = bit(opcode, 23);
     u32 flag_s = bit(opcode, 22);
@@ -460,7 +426,6 @@ static uint arm_execute_block_transfer(Cpu *this, u32 opcode)
 
 static uint arm_execute_single_transfer(Cpu *this, u32 opcode)
 {
-    puts("LD/ST Single");
 
     u32 flag_i = bit(opcode, 25);
     u32 flag_p = bit(opcode, 24);
@@ -557,7 +522,6 @@ static uint arm_execute_psr_transfer(Cpu *this, u32 opcode)
     u32 flag_op = opcode & BIT_21;
 
     if (flag_op) {
-        puts("MSR");
         // MSR : Status <-- Register
         u32 flag_f = opcode & BIT_19;
         u32 flag_s = opcode & BIT_18;
@@ -596,7 +560,6 @@ static uint arm_execute_psr_transfer(Cpu *this, u32 opcode)
             cpu_bank_registers(this);
         }
     } else {
-        puts("MRS");
         // MRS : Register <-- Status
         u32 rd = (opcode >> 12) & 0xF;
         if (flag_psr) {
@@ -610,7 +573,6 @@ static uint arm_execute_psr_transfer(Cpu *this, u32 opcode)
 
 static uint arm_execute_branch_exchange(Cpu *this, u32 opcode)
 {
-    puts("BX");
 
     u32 rn = opcode & 0xF;
 
@@ -620,11 +582,9 @@ static uint arm_execute_branch_exchange(Cpu *this, u32 opcode)
     if (reg(rn) & 1) {
         // Switch to Thumb
         set_bit(this->cpsr, PSR_BIT_T);
-        puts("SWITCH TO THUMB");
     } else {
         // Switch to ARM
         clear_bit(this->cpsr, PSR_BIT_T);
-        puts("SWITCH TO ARM");
     }
 
     return 1;
@@ -632,7 +592,6 @@ static uint arm_execute_branch_exchange(Cpu *this, u32 opcode)
 
 static uint arm_execute_data_swap(Cpu *this, u32 opcode)
 {
-    puts("SWAP");
     u32 rn = bits(opcode,  16, 4);
     u32 rd = bits(opcode,  12, 4);
     u32 rm = bits(opcode,  0, 4);
@@ -669,7 +628,6 @@ static uint arm_execute_data_swap(Cpu *this, u32 opcode)
 
 static uint arm_execute_multiply(Cpu *this, u32 opcode)
 {
-    puts("MUL/MLA");
     u32 rd = bits(opcode, 16, 4);
     u32 rn = bits(opcode, 12, 4);
     u32 rs = bits(opcode, 8, 4);
@@ -696,7 +654,6 @@ static uint arm_execute_multiply(Cpu *this, u32 opcode)
 
 static uint arm_execute_multiply_long(Cpu *this, u32 opcode)
 {
-    puts("MULL/MLAL");
     u32 rdhi = bits(opcode, 16, 4);
     u32 rdlo = bits(opcode, 12, 4);
     u32 rs = bits(opcode, 8, 4);

@@ -65,10 +65,6 @@ void cpu_handle_interrupts(Cpu *this)
     u16 irq_enable = bus_read16(this->bus, 0x4000200);
 
     if (irq_flag & irq_enable) {
-        puts("IRQ");
-        printf("irq_flag:    %04X\n", irq_flag);
-        printf("irq_enable:  %04X\n", irq_enable);
-
         this->reg_irq[1] = reg(15) + 4;
         if (!this->pc_changed) {
             if (is_clear(this->cpsr, PSR_BIT_T)) {

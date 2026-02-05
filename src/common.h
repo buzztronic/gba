@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdio.h> // for stderr
 
 typedef unsigned int uint;
 typedef uint8_t u8;
@@ -13,14 +14,6 @@ typedef int32_t i32;
 typedef int64_t i64;
 
 enum PpuState {PPU_STATE_HDRAW, PPU_STATE_HBLANK, PPU_STATE_VBLANK};
-
-#define DISABLE_PRINT
-
-#ifdef DISABLE_PRINT
-    #define printf(...)
-    // #define fprintf(...)
-    #define puts(foo)
-#endif
 
 #define eprintf(...) fprintf(stderr, __VA_ARGS__)
 
