@@ -24,8 +24,18 @@ enum CpuMode {
     CPU_MODE_SYS = 15,
 };
 
+enum TransType { TRANS_READ_CODE, TRANS_READ, TRANS_WRITE };
+typedef struct Transaction {
+    enum TransType type;
+    u8 size;
+    u32 addr;
+    u32 data;
+} Transaction;
+
 typedef struct Cpu {
     Bus *bus;
+    Transaction *tlist;
+    u32 tlen;
 
     // decoding look up table
     uint (*decode[1 << 12]) (struct Cpu *, u32);
@@ -60,3 +70,26 @@ typedef struct Cpu {
 
 Cpu *cpu_init(Bus *bus);
 uint cpu_step(Cpu *this);
+
+void cpu_bank_registers(Cpu *this);
+uint cpu_software_interrupt(Cpu *this, u32 opcode);
+void cpu_handle_interrupts(Cpu *this);
+
+u32 alu_sub(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_add(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_and(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_eor(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_adc(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_orr(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_mov(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_bic(u32 op1, u32 op2, u32 *cpsr);
+u32 alu_mvn(u32 op1, u32 op2, u32 *cpsr);
+
+void cpu_update_zn(u32 result, u32 *cpsr);
+
+#ifdef RUN_CPU_TESTS
+void cpu_test(const char *path);
+#endif

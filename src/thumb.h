@@ -2,4 +2,5 @@
 
 #include "cpu.h"
 
-uint cpu_step_thumb(Cpu *this);
+uint thumb_step(Cpu *this);
+void thumb_build_decode_table(Cpu *this);

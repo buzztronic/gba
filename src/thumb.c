@@ -1,13 +1,11 @@
 #include <stdio.h>
 #include <assert.h>
-#include <stdlib.h>
 
 #include "thumb.h"
 
 // declarations
-static u16 cpu_fetch_thumb(Cpu *this);
-static void cpu_reset_pipeline_thumb(Cpu *this);
-static void cpu_build_decode_table_thumb(Cpu *this);
+static u16 thumb_fetch(Cpu *this);
+static void thumb_flush_pipeline(Cpu *this);
 
 static uint thumb_execute_not_implemented(Cpu *this, u16 opcode);
 static uint thumb_move_immediate(Cpu *this, u16 opcode);
@@ -32,7 +30,6 @@ static uint thumb_ldst_multiple(Cpu *this, u16 opcode);
 static uint thumb_software_interrupt(Cpu *this, u16 opcode);
 
 static const char *bin8_str(u8 data);
-static const char *bin16_str(u16 data);
 
 // defined in cpu.c
 u32 alu_sub(u32 op1, u32 op2, u32 *cpsr);
@@ -95,14 +92,9 @@ static const char *const alu_mnemonic_thumb[] = {
     "MVN"
 };
 
-void cpu_init_thumb(Cpu *this)
+uint thumb_step(Cpu *this)
 {
-    cpu_build_decode_table_thumb(this);
-}
-
-uint cpu_step_thumb(Cpu *this)
-{
-    u16 opcode = cpu_fetch_thumb(this);
+    u16 opcode = thumb_fetch(this);
     uint cycles = 0;
 
     printf("%08X %04X %s ", (reg(15) & ~1) - 4, opcode, bin8_str(opcode >> 8));
@@ -112,13 +104,13 @@ uint cpu_step_thumb(Cpu *this)
     return cycles;
 }
 
-static u16 cpu_fetch_thumb(Cpu *this)
+static u16 thumb_fetch(Cpu *this)
 {
     u16 opcode;
 
     reg(15) &= ~1;
     if (this->pc_changed) {
-        cpu_reset_pipeline_thumb(this);
+        thumb_flush_pipeline(this);
         this->pc_changed = 0;
     } else {
         reg(15) += 2;
@@ -131,14 +123,19 @@ static u16 cpu_fetch_thumb(Cpu *this)
     return opcode;
 }
 
-static void cpu_reset_pipeline_thumb(Cpu *this)
+static void thumb_flush_pipeline(Cpu *this)
 {
     this->execute_opcode = bus_read16(this->bus, reg(15) & ~1);
     this->decode_opcode = bus_read16(this->bus, (reg(15) & ~1) + 2);
     reg(15) += 4;
 }
 
-static void cpu_build_decode_table_thumb(Cpu *this)
+static uint thumb_software_interrupt(Cpu *this, u16 opcode)
+{
+    return cpu_software_interrupt(this, opcode);
+}
+
+void thumb_build_decode_table(Cpu *this)
 {
     for (uint idx = 0; idx <= 0xFF; idx++) {
         u16 opcode = idx << 8;
@@ -887,25 +884,6 @@ static uint thumb_ldst_multiple(Cpu *this, u16 opcode)
     return 1;
 }
 
-static uint thumb_software_interrupt(Cpu *this, u16 opcode)
-{
-    this->reg_svc[1] = reg(15) - 2;
-    this->spsr[CPU_MODE_SVC] = this->cpsr;
-
-    this->cpsr &= 0xFFFFFFF0;
-    this->cpsr |= CPU_MODE_SVC;
-    clear_bit(this->cpsr, PSR_BIT_T);
-    set_bit(this->cpsr, PSR_BIT_I);
-
-    void cpu_bank_registers(Cpu *);
-    cpu_bank_registers(this);
-
-    reg(15) = 0x00000008;
-    this->pc_changed = 1;
-
-    return 1;
-}
-
 static u32 alu_lsl(u32 op1, u32 op2, u32 *cpsr)
 {
     u32 result = op1;
@@ -1019,7 +997,7 @@ static u32 alu_neg(u32 op1, u32 op2, u32 *cpsr)
     else
         clear_bit(*cpsr, PSR_BIT_C);
 
-    if (op2 == ~0)
+    if (op2 == ~0U)
         set_bit(*cpsr, PSR_BIT_V);
     else
         clear_bit(*cpsr, PSR_BIT_V);
@@ -1030,18 +1008,6 @@ static u32 alu_neg(u32 op1, u32 op2, u32 *cpsr)
 static u32 alu_mul(u32 op1, u32 op2, u32 *cpsr)
 {
     return op1 * op2;
-}
-
-static const char *bin16_str(u16 data)
-{
-    static char buff[] = "XXXX_XXXX_XXXX_XXXX";
-    for (int i = 18; i >= 0; i--) {
-        if (buff[i] == '_')
-            continue;
-        buff[i] = "01"[data & 1];
-        data >>= 1;
-    }
-    return buff;
 }
 
 static const char *bin8_str(u8 data)
