@@ -24,18 +24,8 @@ enum CpuMode {
     CPU_MODE_SYS = 15,
 };
 
-enum TransType { TRANS_READ_CODE, TRANS_READ, TRANS_WRITE };
-typedef struct Transaction {
-    enum TransType type;
-    u8 size;
-    u32 addr;
-    u32 data;
-} Transaction;
-
 typedef struct Cpu {
     Bus *bus;
-    Transaction *tlist;
-    u32 tlen;
 
     // decoding look up table
     uint (*decode[1 << 12]) (struct Cpu *, u32);
@@ -89,7 +79,3 @@ u32 alu_bic(u32 op1, u32 op2, u32 *cpsr);
 u32 alu_mvn(u32 op1, u32 op2, u32 *cpsr);
 
 void cpu_update_zn(u32 result, u32 *cpsr);
-
-#ifdef RUN_CPU_TESTS
-void cpu_test(const char *path);
-#endif
