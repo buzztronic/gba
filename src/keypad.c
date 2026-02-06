@@ -8,8 +8,8 @@
 #define KEY_RIGHT   SDLK_QUOTE
 #define KEY_A       SDLK_c
 #define KEY_B       SDLK_x
-#define KEY_R       SDLK_d
-#define KEY_L       SDLK_s
+#define KEY_R       SDLK_s
+#define KEY_L       SDLK_a
 #define KEY_START   SDLK_RETURN
 #define KEY_SELECT  SDLK_BACKSPACE
 
