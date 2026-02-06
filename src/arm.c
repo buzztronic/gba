@@ -581,12 +581,9 @@ static uint arm_execute_branch_exchange(Cpu *this, u32 opcode)
     reg(15) = reg(rn);
     this->pc_changed = 1;
 
-    if (reg(rn) & 1) {
+    if (is_set(reg(rn), 0)) {
         // Switch to Thumb
         set_bit(this->cpsr, PSR_BIT_T);
-    } else {
-        // Switch to ARM
-        clear_bit(this->cpsr, PSR_BIT_T);
     }
 
     return 1;

@@ -406,20 +406,11 @@ static uint thumb_branch_exchange(Cpu *this, u16 opcode)
 {
     u32 rs = bits(opcode, 3, 4);
 
-    if (rs == 15) {
-        rs = reg(15) & ~1;
-    } else {
-        rs = reg(rs);
-    }
-
-    reg(15) = rs;
+    reg(15) = reg(rs);
     this->pc_changed = 1;
 
-    if (rs & 1) {
-        // Switch to Thumb
-        set_bit(this->cpsr, PSR_BIT_T);
-    } else {
-        // Switch to ARM
+    if (is_clear(reg(rs), 0)) {
+        // switch to arm
         clear_bit(this->cpsr, PSR_BIT_T);
     }
 
