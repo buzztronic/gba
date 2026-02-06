@@ -4,6 +4,13 @@
 #include "arm.h"
 #include "thumb.h"
 
+// global
+u8 cpu_cond_lut[1 << 8];
+
+// declarations
+static void cpu_build_condition_table(void);
+
+// functions
 Cpu *cpu_init(Bus *bus)
 {
     Cpu *cpu = malloc(sizeof(Cpu));
@@ -35,11 +42,83 @@ Cpu *cpu_init(Bus *bus)
     cpu->bus = bus;
     cpu->pc_changed = 1;
 
-    arm_build_condition_table(cpu);
-    arm_build_decode_table(cpu);
-    thumb_build_decode_table(cpu);
-
     return cpu;
+}
+
+void cpu_init_global(void)
+{
+    cpu_build_condition_table();
+    arm_build_decode_table();
+    thumb_build_decode_table();
+}
+
+void cpu_build_condition_table(void)
+{
+    for (uint idx = 0; idx < (1 << 8); ++idx) {
+        u32 cpsr = bits(idx, 4, 4) << 28;
+        switch (bits(idx, 0, 4)) {
+            case 0x0:
+                // EQ
+                cpu_cond_lut[idx] = !!is_set(cpsr, PSR_BIT_Z);
+            break;
+            case 0x1:
+                // NE
+                cpu_cond_lut[idx] = !!is_clear(cpsr, PSR_BIT_Z);
+            break;
+            case 0x2:
+                // CS
+                cpu_cond_lut[idx] = !!is_set(cpsr, PSR_BIT_C);
+            break;
+            case 0x3:
+                // CC
+                cpu_cond_lut[idx] = !!is_clear(cpsr, PSR_BIT_C);
+            break;
+            case 0x4:
+                // MI
+                cpu_cond_lut[idx] = !!is_set(cpsr, PSR_BIT_N);
+            break;
+            case 0x5:
+                // PL
+                cpu_cond_lut[idx] = !!is_clear(cpsr, PSR_BIT_N);
+            break;
+            case 0x6:
+                // VS
+                cpu_cond_lut[idx] = !!is_set(cpsr, PSR_BIT_V);
+            break;
+            case 0x7:
+                // VC
+                cpu_cond_lut[idx] = !!is_clear(cpsr, PSR_BIT_V);
+            break;
+            case 0x8:
+                // HI
+                cpu_cond_lut[idx] = is_set(cpsr, PSR_BIT_C) && is_clear(cpsr, PSR_BIT_Z);
+            break;
+            case 0x9:
+                // LS
+                cpu_cond_lut[idx] = is_clear(cpsr, PSR_BIT_C) || is_set(cpsr, PSR_BIT_Z);
+            break;
+            case 0xA:
+                // GE
+                cpu_cond_lut[idx] = bit(cpsr, PSR_BIT_N) == bit(cpsr, PSR_BIT_V);
+            break;
+            case 0xB:
+                // LT
+                cpu_cond_lut[idx] = bit(cpsr, PSR_BIT_N) != bit(cpsr, PSR_BIT_V);
+            break;
+            case 0xC:
+                // GT
+                cpu_cond_lut[idx] = is_clear(cpsr, PSR_BIT_Z) && bit(cpsr, PSR_BIT_N) == bit(cpsr, PSR_BIT_V);
+            break;
+            case 0xD:
+                // LE
+                cpu_cond_lut[idx] = !!is_set(cpsr, PSR_BIT_Z) || (bit(cpsr, PSR_BIT_N) != bit(cpsr, PSR_BIT_V));
+            break;
+            case 0xE:
+                // AL
+                cpu_cond_lut[idx] = 1;
+            break;
+        }
+    }
 }
 
 uint cpu_step(Cpu *this)

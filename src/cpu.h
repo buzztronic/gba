@@ -27,15 +27,6 @@ enum CpuMode {
 typedef struct Cpu {
     Bus *bus;
 
-    // decoding look up table
-    uint (*decode[1 << 12]) (struct Cpu *, u32);
-    uint (*decode_thumb[1 << 8]) (struct Cpu *, u16);
-
-    // lookup table to check for conditions
-    // low nibble = condition code from the instruction
-    // high nibble = condition flags from cpsr
-    u8 cond_pass[1 << 8];
-
     u32 *reg[16];
 
     u32 reg_usr[16];
@@ -58,6 +49,12 @@ typedef struct Cpu {
     u32 pc_changed;
 } Cpu;
 
+// lookup table to check for conditions
+// low nibble = condition code from the instruction
+// high nibble = condition flags from cpsr
+extern u8 cpu_cond_lut[1 << 8];
+
+void cpu_init_global(void);
 Cpu *cpu_init(Bus *bus);
 uint cpu_step(Cpu *this);
 

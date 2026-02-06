@@ -2,6 +2,5 @@
 
 #include "cpu.h"
 
-void arm_build_decode_table(Cpu *this);
-void arm_build_condition_table(Cpu *this);
+void arm_build_decode_table(void);
 uint arm_step(Cpu *this);

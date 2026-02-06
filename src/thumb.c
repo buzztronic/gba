@@ -2,6 +2,8 @@
 
 #include "thumb.h"
 
+static uint (*thumb_decode_lut[1 << 8]) (struct Cpu *, u16);
+
 // declarations
 static u16 thumb_fetch(Cpu *this);
 static void thumb_flush_pipeline(Cpu *this);
@@ -75,7 +77,7 @@ uint thumb_step(Cpu *this)
     u16 opcode = thumb_fetch(this);
     uint cycles = 0;
 
-    cycles = this->decode_thumb[opcode >> 8](this, opcode);
+    cycles = thumb_decode_lut[opcode >> 8](this, opcode);
 
     return cycles;
 }
@@ -111,41 +113,46 @@ static uint thumb_software_interrupt(Cpu *this, u16 opcode)
     return cpu_software_interrupt(this, opcode);
 }
 
-void thumb_build_decode_table(Cpu *this)
+void thumb_build_decode_table(void)
 {
+    // insure this function is called only once
+    static int counter = 0;
+    assert(counter == 0);
+    counter++;
+
     for (uint idx = 0; idx <= 0xFF; idx++) {
         u16 opcode = idx << 8;
-        this->decode_thumb[idx] = thumb_execute_not_implemented;
+        thumb_decode_lut[idx] = thumb_execute_not_implemented;
         if (bits(opcode, 13, 3) == 0) {
             if (bits(opcode, 11, 2) != 3) {
                 // move shifted register
-                this->decode_thumb[idx] = thumb_move_shifted_register;
+                thumb_decode_lut[idx] = thumb_move_shifted_register;
             } else {
                 // Add/Sub
-                this->decode_thumb[idx] = thumb_add_sub;
+                thumb_decode_lut[idx] = thumb_add_sub;
             }
             continue;
         }
 
         if (bits(opcode, 13, 3) == 1) {
             // mov, cmp, add, sub immediate
-            this->decode_thumb[idx] = thumb_move_immediate;
+            thumb_decode_lut[idx] = thumb_move_immediate;
             continue;
         }
 
         if (bits(opcode, 10, 6) == 0x10) {
             // ALU operation
-            this->decode_thumb[idx] = thumb_alu;
+            thumb_decode_lut[idx] = thumb_alu;
             continue;
         }
 
         if (bits(opcode, 10, 6) == 0x11) {
             if (bits(opcode, 8, 2) == 3) {
                 // bx
-                this->decode_thumb[idx] = thumb_branch_exchange;
+                thumb_decode_lut[idx] = thumb_branch_exchange;
             } else {
                 // Hi register operation
-                this->decode_thumb[idx] = thumb_hi_operation;
+                thumb_decode_lut[idx] = thumb_hi_operation;
             }
             continue;
         }
@@ -153,82 +160,82 @@ void thumb_build_decode_table(Cpu *this)
 
         if (bits(opcode, 11, 5) == 9) {
             // PC relative load
-            this->decode_thumb[idx] = thumb_load_pc_relative;
+            thumb_decode_lut[idx] = thumb_load_pc_relative;
             continue;
         }
 
         if (bits(opcode, 12, 4) == 5) {
             if (bit(opcode, 9) == 0) {
                 // Load/store with register offset
-                this->decode_thumb[idx] = thumb_ldst_register_offset;
+                thumb_decode_lut[idx] = thumb_ldst_register_offset;
             } else {
                 // Load/store sign-extended byte/halfword
-                this->decode_thumb[idx] = thumb_ldst_signed;
+                thumb_decode_lut[idx] = thumb_ldst_signed;
             }
             continue;
         }
 
         if (bits(opcode, 13, 3) == 3) {
             // Load/store with immediate offset
-            this->decode_thumb[idx] = thumb_ldst_immediate;
+            thumb_decode_lut[idx] = thumb_ldst_immediate;
             continue;
         }
 
         if (bits(opcode, 12, 4) == 8) {
             // Load/store halfword
-            this->decode_thumb[idx] = thumb_ldst_halfword;
+            thumb_decode_lut[idx] = thumb_ldst_halfword;
             continue;
         }
 
         if (bits(opcode, 12, 4) == 9) {
             // SP-relative load/store
-            this->decode_thumb[idx] = thumb_ldst_sp_relative;
+            thumb_decode_lut[idx] = thumb_ldst_sp_relative;
             continue;
         }
 
         if (bits(opcode, 12, 4) == 10) {
             // Load address
-            this->decode_thumb[idx] = thumb_load_address;
+            thumb_decode_lut[idx] = thumb_load_address;
             continue;
         }
 
         if (bits(opcode, 12, 4) == 11) {
             if (bit(opcode, 10) == 0) {
                 // Add offset to stack pointer
-                this->decode_thumb[idx] = thumb_add_stack_pointer;
+                thumb_decode_lut[idx] = thumb_add_stack_pointer;
             } else {
                 // Push/pop registers
-                this->decode_thumb[idx] = thumb_push_pop_registers;
+                thumb_decode_lut[idx] = thumb_push_pop_registers;
             }
             continue;
         }
 
         if (bits(opcode, 12, 4) == 12) {
             // Multiple load/store
-            this->decode_thumb[idx] = thumb_ldst_multiple;
+            thumb_decode_lut[idx] = thumb_ldst_multiple;
             continue;
         }
 
         if (bits(opcode, 12, 4) == 13) {
             if (bits(opcode, 8, 4) != 0xF) {
                 // Conditional branch
-                this->decode_thumb[idx] = thumb_cond_branch;
+                thumb_decode_lut[idx] = thumb_cond_branch;
             } else {
                 // Software Interrupt
-                this->decode_thumb[idx] = thumb_software_interrupt;
+                thumb_decode_lut[idx] = thumb_software_interrupt;
             }
             continue;
         }
 
         if (bits(opcode, 12, 4) == 14) {
             // Unconditional branch
-            this->decode_thumb[idx] = thumb_branch;
+            thumb_decode_lut[idx] = thumb_branch;
             continue;
         }
 
         if (bits(opcode, 12, 4) == 0xF) {
             // Long branch with link
-            this->decode_thumb[idx] = thumb_branch_link;
+            thumb_decode_lut[idx] = thumb_branch_link;
             continue;
         }
 
@@ -280,7 +287,7 @@ static uint thumb_cond_branch(Cpu *this, u16 opcode)
 {
     u32 cond_idx = bits(opcode, 8, 4);
     cond_idx |= bits(this->cpsr, 28, 4) << 4;
-    if (this->cond_pass[cond_idx]) {
+    if (cpu_cond_lut[cond_idx]) {
         u32 offset = opcode & 0xFF;
 
         reg(15) += ((i8)offset) * 2;

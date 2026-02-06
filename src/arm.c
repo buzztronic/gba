@@ -4,6 +4,8 @@
 #include "arm.h"
 #include "common.h"
 
+static uint (*arm_decode_lut[1 << 12]) (struct Cpu *, u32);
+
 // declarations
 static u32 arm_fetch(Cpu *this);
 static void arm_flush_pipeline(Cpu *this);
@@ -54,9 +56,9 @@ uint arm_step(Cpu *this)
     cond_idx |= bits(this->cpsr, 28, 4) << 4;
 
     // decode and execute
-    if (this->cond_pass[cond_idx]) {
+    if (cpu_cond_lut[cond_idx]) {
         u32 index = (bits(opcode, 20, 8) << 4) | bits(opcode, 4, 4);
-        cycles = this->decode[index](this, opcode);
+        cycles = arm_decode_lut[index](this, opcode);
     } else {
         cycles = 1;
     }
@@ -705,7 +707,7 @@ static uint arm_execute_multiply_long(Cpu *this, u32 opcode)
     return 1;
 }
 
-void arm_build_decode_table(Cpu *this)
+void arm_build_decode_table(void)
 {
     // TODO Clean up this mess
     for (uint idx = 0; idx < (1 << 12); ++idx) {
@@ -714,27 +716,27 @@ void arm_build_decode_table(Cpu *this)
         // bits[4:12] become bits[20:27]
         u32 opcode = (bits(idx, 4, 8) << 20) | (bits(idx, 0, 4) << 4);
         if (bits(opcode, 24, 4) == 0xF) {
-            this->decode[idx] = cpu_software_interrupt;
+            arm_decode_lut[idx] = cpu_software_interrupt;
             continue;
         }
         if (bits(opcode, 22, 6) == 0 && bits(opcode, 4, 4) == 9) {
-            this->decode[idx] = arm_execute_multiply;
+            arm_decode_lut[idx] = arm_execute_multiply;
             continue;
         }
         if (bits(opcode, 23, 5) == 1 && bits(opcode, 4, 4) == 9) {
-            this->decode[idx] = arm_execute_multiply_long;
+            arm_decode_lut[idx] = arm_execute_multiply_long;
             continue;
         }
         if (bits(opcode, 23, 5) == 2 && bits(opcode, 20, 2) == 0 && bits(opcode, 4, 8) == 9) {
-            this->decode[idx] = arm_execute_data_swap;
+            arm_decode_lut[idx] = arm_execute_data_swap;
             continue;
         }
         if (bits(opcode, 20, 8) == 0x12 && bits(opcode, 4, 4) == 1) {
-            this->decode[idx] = arm_execute_branch_exchange;
+            arm_decode_lut[idx] = arm_execute_branch_exchange;
             continue;
         }
         if (bits(opcode, 25, 3) == 5) {
-            this->decode[idx] = arm_execute_branch;
+            arm_decode_lut[idx] = arm_execute_branch;
             continue;
         }
         if (bits(opcode, 26, 2) == 0) {
@@ -745,23 +747,23 @@ void arm_build_decode_table(Cpu *this)
             // otherwise it is not an ALU instruction.
             if (bit(opcode, 25) == 0 && bit(opcode, 4) && bit(opcode, 7)) {
             } else if (bit(opcode, 20) == 0 && alu_opcode >= 8 && alu_opcode <= 11) {
-                this->decode[idx] = arm_execute_psr_transfer;
+                arm_decode_lut[idx] = arm_execute_psr_transfer;
                 continue;
             } else {
-                this->decode[idx] = arm_execute_alu;
+                arm_decode_lut[idx] = arm_execute_alu;
                 continue;
             }
         }
         if (bits(opcode, 25, 3) == 4) {
-            this->decode[idx] = arm_execute_block_transfer;
+            arm_decode_lut[idx] = arm_execute_block_transfer;
             continue;
         }
         if (bits(opcode, 26, 2) == 1) {
             if (bit(opcode, 25) & bit(opcode, 4)) {
                 // TODO: this is an undefined instruction
-                this->decode[idx] = arm_execute_not_implemented;
+                arm_decode_lut[idx] = arm_execute_not_implemented;
             } else {
-                this->decode[idx] = arm_execute_single_transfer;
+                arm_decode_lut[idx] = arm_execute_single_transfer;
             }
             continue;
         }
@@ -770,80 +772,10 @@ void arm_build_decode_table(Cpu *this)
         } else if (bit(opcode, 24) == 0 && bit(opcode, 21) == 1) {
             // not signed transfer
         } else if (bits(opcode, 25, 3) == 0 && bit(opcode, 4) && bit(opcode, 7)) {
-            this->decode[idx] = arm_execute_signed_transfer;
+            arm_decode_lut[idx] = arm_execute_signed_transfer;
             continue;
         }
-        this->decode[idx] = arm_execute_not_implemented;
-    }
-}
-
-
-void arm_build_condition_table(Cpu *this)
-{
-    for (uint idx = 0; idx < (1 << 8); ++idx) {
-        u32 cpsr = bits(idx, 4, 4) << 28;
-        switch (bits(idx, 0, 4)) {
-            case 0x0:
-                // EQ
-                this->cond_pass[idx] = !!is_set(cpsr, PSR_BIT_Z);
-            break;
-            case 0x1:
-                // NE
-                this->cond_pass[idx] = !!is_clear(cpsr, PSR_BIT_Z);
-            break;
-            case 0x2:
-                // CS
-                this->cond_pass[idx] = !!is_set(cpsr, PSR_BIT_C);
-            break;
-            case 0x3:
-                // CC
-                this->cond_pass[idx] = !!is_clear(cpsr, PSR_BIT_C);
-            break;
-            case 0x4:
-                // MI
-                this->cond_pass[idx] = !!is_set(cpsr, PSR_BIT_N);
-            break;
-            case 0x5:
-                // PL
-                this->cond_pass[idx] = !!is_clear(cpsr, PSR_BIT_N);
-            break;
-            case 0x6:
-                // VS
-                this->cond_pass[idx] = !!is_set(cpsr, PSR_BIT_V);
-            break;
-            case 0x7:
-                // VC
-                this->cond_pass[idx] = !!is_clear(cpsr, PSR_BIT_V);
-            break;
-            case 0x8:
-                // HI
-                this->cond_pass[idx] = is_set(cpsr, PSR_BIT_C) && is_clear(cpsr, PSR_BIT_Z);
-            break;
-            case 0x9:
-                // LS
-                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_C) || is_set(cpsr, PSR_BIT_Z);
-            break;
-            case 0xA:
-                // GE
-                this->cond_pass[idx] = bit(cpsr, PSR_BIT_N) == bit(cpsr, PSR_BIT_V);
-            break;
-            case 0xB:
-                // LT
-                this->cond_pass[idx] = bit(cpsr, PSR_BIT_N) != bit(cpsr, PSR_BIT_V);
-            break;
-            case 0xC:
-                // GT
-                this->cond_pass[idx] = is_clear(cpsr, PSR_BIT_Z) && bit(cpsr, PSR_BIT_N) == bit(cpsr, PSR_BIT_V);
-            break;
-            case 0xD:
-                // LE
-                this->cond_pass[idx] = !!is_set(cpsr, PSR_BIT_Z) || (bit(cpsr, PSR_BIT_N) != bit(cpsr, PSR_BIT_V));
-            break;
-            case 0xE:
-                // AL
-                this->cond_pass[idx] = 1;
-            break;
-        }
+        arm_decode_lut[idx] = arm_execute_not_implemented;
     }
 }
 
