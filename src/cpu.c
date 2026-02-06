@@ -198,9 +198,9 @@ void cpu_handle_interrupts(Cpu *this)
 uint cpu_software_interrupt(Cpu *this, u32 opcode)
 {
     if (is_clear(this->cpsr, PSR_BIT_T)) {
-        this->reg_svc[1] = (reg(15) - 4) & ~3;
+        this->reg_svc[1] = reg(15) - 4;
     } else {
-        this->reg_svc[1] = (reg(15) - 2) & ~1;
+        this->reg_svc[1] = reg(15) - 2;
     }
 
     this->spsr[CPU_MODE_SVC] = this->cpsr;

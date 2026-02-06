@@ -69,15 +69,15 @@ u32 arm_fetch(Cpu *this)
 {
     const u32 opcode = this->execute_opcode;
     this->execute_opcode = this->decode_opcode;
-    this->decode_opcode = bus_read32(this->bus, reg(15) & ~3);
+    this->decode_opcode = bus_read32(this->bus, reg(15));
 
     return opcode;
 }
 
 void arm_flush_pipeline(Cpu *this)
 {
-    this->execute_opcode = bus_read32(this->bus, reg(15) & ~3);
-    this->decode_opcode = bus_read32(this->bus, (reg(15) & ~3) + 4);
+    this->execute_opcode = bus_read32(this->bus, reg(15));
+    this->decode_opcode = bus_read32(this->bus, reg(15) + 4);
     reg(15) += 8;
 }
 

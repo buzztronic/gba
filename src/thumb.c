@@ -85,15 +85,15 @@ static u16 thumb_fetch(Cpu *this)
 {
     const u32 opcode = this->execute_opcode;
     this->execute_opcode = this->decode_opcode;
-    this->decode_opcode = bus_read16(this->bus, reg(15) & ~1);
+    this->decode_opcode = bus_read16(this->bus, reg(15));
 
     return opcode;
 }
 
 void thumb_flush_pipeline(Cpu *this)
 {
-    this->execute_opcode = bus_read16(this->bus, reg(15) & ~1);
-    this->decode_opcode = bus_read16(this->bus, (reg(15) & ~1) + 2);
+    this->execute_opcode = bus_read16(this->bus, reg(15));
+    this->decode_opcode = bus_read16(this->bus, reg(15) + 2);
     reg(15) += 4;
 }
 
