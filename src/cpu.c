@@ -40,7 +40,13 @@ Cpu *cpu_init(Bus *bus)
     bus_write16(bus, 0x4000202, 0xFFFF);
 
     cpu->bus = bus;
-    cpu->pc_changed = 1;
+    cpu->pc_changed = 0;
+
+    if (is_clear(cpu->cpsr, PSR_BIT_T)) {
+        arm_flush_pipeline(cpu);
+    } else {
+        thumb_flush_pipeline(cpu);
+    }
 
     return cpu;
 }
@@ -125,12 +131,32 @@ uint cpu_step(Cpu *this)
 {
     cpu_handle_interrupts(this);
 
+    u32 cycles = 0;
     if (is_clear(this->cpsr, PSR_BIT_T)) {
-        return arm_step(this);
+        cycles = arm_step(this);
     } else {
-        return thumb_step(this);
+        cycles = thumb_step(this);
     }
-    return 0;
+
+    if (is_clear(this->cpsr, PSR_BIT_T)) {
+        reg(15) &= ~3;
+        if (this->pc_changed) {
+            arm_flush_pipeline(this);
+        } else {
+            reg(15) += 4;
+        }
+    } else {
+        reg(15) &= ~1;
+        if (this->pc_changed) {
+            thumb_flush_pipeline(this);
+        } else {
+            reg(15) += 2;
+        }
+    }
+
+    this->pc_changed = 0;
+
+    return cycles;
 }
 
 void cpu_handle_interrupts(Cpu *this)
@@ -145,14 +171,10 @@ void cpu_handle_interrupts(Cpu *this)
 
     if (irq_flag & irq_enable) {
         this->reg_irq[1] = reg(15) + 4;
-        if (!this->pc_changed) {
-            if (is_clear(this->cpsr, PSR_BIT_T)) {
-                this->reg_irq[1] -= 4;
-                this->reg_irq[1] &= ~3;
-            } else {
-                this->reg_irq[1] -= 2;
-                this->reg_irq[1] &= ~1;
-            }
+        if (is_clear(this->cpsr, PSR_BIT_T)) {
+            this->reg_irq[1] -= 8;
+        } else {
+            this->reg_irq[1] -= 4;
         }
 
         this->spsr[CPU_MODE_IRQ] = this->cpsr;
@@ -168,7 +190,8 @@ void cpu_handle_interrupts(Cpu *this)
         set_bit(this->cpsr, PSR_BIT_I);
 
         reg(15) = 0x00000018;
-        this->pc_changed = 1;
+
+        arm_flush_pipeline(this);
     }
 }
 

@@ -8,7 +8,6 @@ static uint (*arm_decode_lut[1 << 12]) (struct Cpu *, u32);
 
 // declarations
 static u32 arm_fetch(Cpu *this);
-static void arm_flush_pipeline(Cpu *this);
 
 static uint arm_execute_not_implemented(Cpu *this, u32 opcode);
 static uint arm_execute_branch(Cpu *this, u32 opcode);
@@ -68,16 +67,7 @@ uint arm_step(Cpu *this)
 
 u32 arm_fetch(Cpu *this)
 {
-    u32 opcode;
-
-    if (this->pc_changed) {
-        arm_flush_pipeline(this);
-        this->pc_changed = 0;
-    } else {
-        reg(15) += 4;
-    }
-
-    opcode = this->execute_opcode;
+    const u32 opcode = this->execute_opcode;
     this->execute_opcode = this->decode_opcode;
     this->decode_opcode = bus_read32(this->bus, reg(15) & ~3);
 

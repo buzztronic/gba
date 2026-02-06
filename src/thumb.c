@@ -6,7 +6,6 @@ static uint (*thumb_decode_lut[1 << 8]) (struct Cpu *, u16);
 
 // declarations
 static u16 thumb_fetch(Cpu *this);
-static void thumb_flush_pipeline(Cpu *this);
 
 static uint thumb_execute_not_implemented(Cpu *this, u16 opcode);
 static uint thumb_move_immediate(Cpu *this, u16 opcode);
@@ -84,24 +83,14 @@ uint thumb_step(Cpu *this)
 
 static u16 thumb_fetch(Cpu *this)
 {
-    u16 opcode;
-
-    reg(15) &= ~1;
-    if (this->pc_changed) {
-        thumb_flush_pipeline(this);
-        this->pc_changed = 0;
-    } else {
-        reg(15) += 2;
-    }
-
-    opcode = this->execute_opcode;
+    const u32 opcode = this->execute_opcode;
     this->execute_opcode = this->decode_opcode;
     this->decode_opcode = bus_read16(this->bus, reg(15) & ~1);
 
     return opcode;
 }
 
-static void thumb_flush_pipeline(Cpu *this)
+void thumb_flush_pipeline(Cpu *this)
 {
     this->execute_opcode = bus_read16(this->bus, reg(15) & ~1);
     this->decode_opcode = bus_read16(this->bus, (reg(15) & ~1) + 2);
