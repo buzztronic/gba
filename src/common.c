@@ -5,6 +5,17 @@ const u32 align_mask[] = { ~0, ~1, ~3 };
 int bit(u32 val, u32 idx);
 u32 bits(u32 val, u32 p, u32 n);
 
+long fsize(FILE *f) {
+	long save, size;
+
+	save = ftell(f);
+	fseek(f, 0, SEEK_END);
+	size = ftell(f);
+	fseek(f, save, SEEK_SET);
+
+	return size;
+}
+
 u32 ror32(u32 data, u32 n)
 {
     u32 saved_bits;

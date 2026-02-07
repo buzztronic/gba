@@ -28,6 +28,7 @@ enum PpuState {PPU_STATE_HDRAW, PPU_STATE_HBLANK, PPU_STATE_VBLANK};
 
 #define in_range(data, start, end) ((data) >= (start) && (data) <= (end))
 
+long fsize(FILE *f);
 u32 ror32(u32 data, u32 n);
 u32 asr32(u32 data, u32 n);
 

@@ -46,12 +46,27 @@ u32 handle_inputs(Keypad *keyp, u32 state)
 
 int main(int argc, char **argv)
 {
+#ifdef RUN_CPU_TESTS
+    // tests repo: https://github.com/SingleStepTests/ARM7TDMI
+
+    if (argc < 2) {
+        eprintf("usage: gba TEST\n");
+        return 1;
+    }
+
+    cpu_init_global();
+    cpu_test_all(argv[1]);
+
+    return 0;
+#endif
     if (argc < 3) {
         eprintf("usage: gba BIOS ROM\n");
         return 1;
     }
 
     SDL_Init(SDL_INIT_EVERYTHING);
+
+    cpu_init_global();
 
     Bus *bus = bus_init(argv[2], argv[1]);
     Cpu *cpu = cpu_init(bus);

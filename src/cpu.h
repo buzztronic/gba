@@ -24,8 +24,29 @@ enum CpuMode {
     CPU_MODE_SYS = 15,
 };
 
+#ifdef RUN_CPU_TESTS
+typedef struct Transaction {
+    u32 kind;
+    u32 size;
+    u32 addr;
+    u32 data;
+} Transaction;
+#endif
+
 typedef struct Cpu {
     Bus *bus;
+
+#ifdef RUN_CPU_TESTS
+    Transaction *tlist;
+    u32 tlist_len;
+    u32 tidx;
+    u32 topcode, topcode_reverse;
+    u32 tbase;
+
+    u32 test_no;
+
+    struct Cpu *initial;
+#endif
 
     u32 *reg[16];
 
@@ -76,3 +97,21 @@ u32 alu_bic(u32 op1, u32 op2, u32 *cpsr);
 u32 alu_mvn(u32 op1, u32 op2, u32 *cpsr);
 
 void cpu_update_zn(u32 result, u32 *cpsr);
+
+#ifdef RUN_CPU_TESTS
+void cpu_test_all(const char *path);
+u32 test_read(Cpu *this, u32 kind, u32 size, u32 addr);
+void test_write(Cpu *this, u32 kind, u32 size, u32 addr, u32 data);
+
+#define bus_read(bus, addr) test_read(this, 1, 1, addr)
+#define bus_read16(bus, addr) test_read(this, 1, 2, addr)
+#define bus_read32(bus, addr) test_read(this, 1, 4, addr)
+
+#define bus_write(bus, addr, data) test_write(this, 2, 1, addr, data)
+#define bus_write16(bus, addr, data) test_write(this, 2, 2, addr, data)
+#define bus_write32(bus, addr, data) test_write(this, 2, 4, addr, data)
+
+#define instruction_read16(addr) test_read(this, 0, 2, addr)
+#define instruction_read32(addr) test_read(this, 0, 4, addr)
+
+#endif

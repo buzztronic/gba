@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdlib.h>
 
 #include "thumb.h"
 
@@ -85,15 +86,25 @@ static u16 thumb_fetch(Cpu *this)
 {
     const u32 opcode = this->execute_opcode;
     this->execute_opcode = this->decode_opcode;
+
+#ifndef RUN_CPU_TESTS
     this->decode_opcode = bus_read16(this->bus, reg(15));
+#else
+    this->decode_opcode = instruction_read16(reg(15));
+#endif
 
     return opcode;
 }
 
 void thumb_flush_pipeline(Cpu *this)
 {
+#ifndef RUN_CPU_TESTS
     this->execute_opcode = bus_read16(this->bus, reg(15));
     this->decode_opcode = bus_read16(this->bus, reg(15) + 2);
+#else
+    this->execute_opcode = instruction_read16(reg(15));
+    this->decode_opcode = instruction_read16(reg(15) + 2);
+#endif
     reg(15) += 4;
 }
 
@@ -234,6 +245,10 @@ void thumb_build_decode_table(void)
 
 static uint thumb_execute_not_implemented(Cpu *this, u16 opcode)
 {
+#ifdef RUN_CPU_TESTS
+    // FIXME
+    exit(0);
+#endif
     eprintf("thumb: unimplemented opcode: %04X\n", opcode);
     return 0;
 }

@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdlib.h>
 
 #include "cpu.h"
 #include "arm.h"
@@ -59,6 +60,7 @@ uint arm_step(Cpu *this)
         u32 index = (bits(opcode, 20, 8) << 4) | bits(opcode, 4, 4);
         cycles = arm_decode_lut[index](this, opcode);
     } else {
+        // eprintf("arm condition failed\n");
         cycles = 1;
     }
 
@@ -69,20 +71,34 @@ u32 arm_fetch(Cpu *this)
 {
     const u32 opcode = this->execute_opcode;
     this->execute_opcode = this->decode_opcode;
+
+#ifndef RUN_CPU_TESTS
     this->decode_opcode = bus_read32(this->bus, reg(15));
+#else
+    this->decode_opcode = instruction_read32(reg(15));
+#endif
 
     return opcode;
 }
 
 void arm_flush_pipeline(Cpu *this)
 {
+#ifndef RUN_CPU_TESTS
     this->execute_opcode = bus_read32(this->bus, reg(15));
     this->decode_opcode = bus_read32(this->bus, reg(15) + 4);
+#else
+    this->execute_opcode = instruction_read32(reg(15));
+    this->decode_opcode = instruction_read32(reg(15) + 4);
+#endif
     reg(15) += 8;
 }
 
 uint arm_execute_not_implemented(Cpu *this, u32 opcode)
 {
+#ifdef RUN_CPU_TESTS
+    // FIXME
+    exit(0);
+#endif
     eprintf("arm: unimplemented opcode: %08X\n", opcode);
     return 0;
 }
