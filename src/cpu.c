@@ -270,78 +270,80 @@ u32 alu_eor(u32 op1, u32 op2, u32 *cpsr)
 u32 alu_sub(u32 op1, u32 op2, u32 *cpsr)
 {
     set_bit(*cpsr, PSR_BIT_C);
-    return alu_adc(op1, ~op2, cpsr);
+    return alu_sbc(op1, op2, cpsr);
 }
 
 u32 alu_rsb(u32 op1, u32 op2, u32 *cpsr)
 {
-    set_bit(*cpsr, PSR_BIT_C);
-    return alu_adc(op2, ~op1, cpsr);
+    return alu_sub(op2, op1, cpsr);
 }
 
 u32 alu_add(u32 op1, u32 op2, u32 *cpsr)
 {
-    const u32 result = op1 + op2;
-    const u8 result_s = bit(result, 31);
-    const u8 op1_s = bit(op1, 31);
-    const u8 op2_s = bit(op2, 31);
-
-    if (op1_s == op2_s && result_s != op1_s)
-        set_bit(*cpsr, PSR_BIT_V);
-    else
-        clear_bit(*cpsr, PSR_BIT_V);
-
-    if (result < op1 || result < op2)
-        set_bit(*cpsr, PSR_BIT_C);
-    else
-        clear_bit(*cpsr, PSR_BIT_C);
-
-    return result;
+    clear_bit(*cpsr, PSR_BIT_C);
+    return alu_adc(op1, op2, cpsr);
 }
 
 u32 alu_adc(u32 op1, u32 op2, u32 *cpsr)
 {
     const u32 carry = bit(*cpsr, PSR_BIT_C);
 
-    const u32 sum = alu_add(op1, op2, cpsr);
+    const u32 ret = op1 + op2 + carry;
 
-    if (carry == 0)
-        return sum;
+    const u32 s1 = bit(op1, 31);
+    const u32 s2 = bit(op2, 31);
+    const u32 s3 = bit(ret, 31);
 
-    const u8 op1_s = bit(op1, 31);
-    const u8 op2_s = bit(op2, 31);
-    const u8 result_s = bit(op1+op2+1, 31);
-
-    if (op1_s == op2_s && result_s != op1_s)
+    // overflow
+    if (s1 == s2 && s1 != s3) {
         set_bit(*cpsr, PSR_BIT_V);
-    else
+    } else {
         clear_bit(*cpsr, PSR_BIT_V);
+    }
 
-    if (sum == ~(u32)0) {
+    // carry
+    if (op1+op2 < op1 || op1+op2 < op2) {
+        set_bit(*cpsr, PSR_BIT_C);
+    } else {
+        clear_bit(*cpsr, PSR_BIT_C);
+    }
+
+    if (ret == 0 && carry == 1) {
         set_bit(*cpsr, PSR_BIT_C);
     }
 
-    return sum + 1;
+    return ret;
 }
 
 u32 alu_sbc(u32 op1, u32 op2, u32 *cpsr)
 {
-    return alu_adc(op1, ~op2, cpsr);
-    u32 not_carry = !bit(*cpsr, PSR_BIT_C);
+    const u32 not_carry = !bit(*cpsr, PSR_BIT_C);
 
-    u32 diff = alu_sub(op1, op2, cpsr);
+    const u32 ret = op1 - op2 - not_carry;
 
-    if (not_carry == 0)
-        return diff;
+    const u32 s1 = bit(op1, 31);
+    const u32 s2 = bit(op2, 31);
+    const u32 s3 = bit(ret, 31);
 
-    if (bit(diff, 31) && !bit(diff-1, 31)) {
+    // overflow
+    if (s1 != s2 && s1 != s3) {
         set_bit(*cpsr, PSR_BIT_V);
-    }
-    if (diff != 0) {
-        set_bit(*cpsr, PSR_BIT_C);
+    } else {
+        clear_bit(*cpsr, PSR_BIT_V);
     }
 
-    return diff - 1;
+    // not borrow
+    if (!(op1 < op2)) {
+        set_bit(*cpsr, PSR_BIT_C);
+    } else {
+        clear_bit(*cpsr, PSR_BIT_C);
+    }
+
+    if (op1-op2 == 0 && not_carry == 1) {
+        clear_bit(*cpsr, PSR_BIT_C);
+    }
+
+    return ret;
 }
 
 u32 alu_rsc(u32 op1, u32 op2, u32 *cpsr)
